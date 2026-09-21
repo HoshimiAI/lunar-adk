@@ -2,7 +2,7 @@
   "name": "lunar-adk",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": ["packages/*", "elysia"],
   "scripts": {
     "typecheck": "tsc --build",
     "test": "bun test"

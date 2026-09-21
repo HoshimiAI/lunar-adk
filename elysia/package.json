@@ -1,0 +1,14 @@
+{
+  "name": "@lunar/elysia-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lunar/foundation": "workspace:*",
+    "elysia": "latest"
+  }
+}
