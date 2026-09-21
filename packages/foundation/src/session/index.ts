@@ -1,6 +1,6 @@
 import type { Session } from "./types";
 
-export { appendMessage, appendRun } from "./history";
+export { appendMessage, appendRun, upsertRun } from "./history";
 export { InMemorySessionStore } from "./store";
 export type { Session } from "./types";
 export type { SessionStore } from "./store";

@@ -9,10 +9,12 @@ export { AgentRunError } from "./errors";
 export { createCancellation, throwIfAborted } from "./cancellation";
 export { canTransition } from "./state";
 export type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentState } from "./types";
+export type { AgentErrorCode } from "./errors";
 
 export function defineAgent(config: AgentConfig, bus: EventBus = new EventBus()): Agent {
   return {
     name: config.name,
+    modelId: config.model.id,
     run: (input: string, options?: AgentRunOptions): Promise<AgentRunResult> =>
       runAgentLoop(config, input, bus, options),
   };

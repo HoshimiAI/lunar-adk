@@ -13,6 +13,10 @@ export interface RuntimeConfig {
 
 export interface RuntimeHandle {
   run(agentName: string, input: string, options?: AgentRunOptions): Promise<AgentRunResult>;
+  steer(sessionId: string, instruction: string): Promise<Session>;
+  approve(runId: string, approvalId: string): Promise<AgentRunResult>;
+  reject(runId: string, approvalId: string): Promise<Run>;
+  cancel(runId: string): Promise<Run | undefined>;
   getRun(runId: string): Run | undefined;
   getStoredRun(runId: string): Promise<Run | undefined>;
   getSession(sessionId: string): Promise<Session | undefined>;

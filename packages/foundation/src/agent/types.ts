@@ -1,8 +1,9 @@
 import type { ModelProvider } from "../model";
 import type { Tool } from "../tool";
 import type { ModelMessage } from "../model";
-import type { Run } from "../run";
 import type { RetryPolicy } from "./retry";
+import type { EventBus } from "../event";
+import type { Run, RunContinuation } from "../run";
 
 export type AgentState = "idle" | "running" | "waiting" | "done" | "error";
 
@@ -20,6 +21,11 @@ export interface AgentRunOptions {
   signal?: AbortSignal;
   history?: ModelMessage[];
   sessionId?: string;
+  eventBus?: EventBus;
+  continuation?: RunContinuation;
+  resumeRun?: Run<string>;
+  initialRun?: Run<string>;
+  approvedToolCallId?: string;
 }
 
 export interface AgentRunResult {
@@ -29,5 +35,6 @@ export interface AgentRunResult {
 
 export interface Agent {
   name: string;
+  modelId?: string;
   run(input: string, options?: AgentRunOptions): Promise<AgentRunResult>;
 }

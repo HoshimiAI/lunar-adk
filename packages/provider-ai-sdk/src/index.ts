@@ -34,6 +34,36 @@ function normalizeToolCalls(toolCalls: Array<{ toolCallId: string; toolName: str
   }));
 }
 
+function toAISDKMessages(messages: ModelCallOptions["messages"]): unknown[] {
+  return messages.map((message) => {
+    if (message.role === "tool") {
+      return {
+        role: "tool",
+        content: [{
+          type: "tool-result",
+          toolCallId: message.toolCallId,
+          output: { type: "text", value: message.content },
+        }],
+      };
+    }
+    if (message.role === "assistant" && message.toolCalls?.length) {
+      return {
+        role: "assistant",
+        content: [
+          ...(message.content ? [{ type: "text", text: message.content }] : []),
+          ...message.toolCalls.map((toolCall) => ({
+            type: "tool-call",
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            input: toolCall.input,
+          })),
+        ],
+      };
+    }
+    return message;
+  });
+}
+
 export function createAISDKModelProvider(options: AISDKModelProviderOptions): ModelProvider {
   return {
     id: options.id,
@@ -42,10 +72,7 @@ export function createAISDKModelProvider(options: AISDKModelProviderOptions): Mo
       const result = await generateText({
         model: options.model,
         system: callOptions.system,
-        messages: callOptions.messages.map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
+        messages: toAISDKMessages(callOptions.messages) as never,
         tools: toTools(callOptions),
         abortSignal: callOptions.signal,
       });

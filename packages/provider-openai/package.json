@@ -1,6 +1,6 @@
 {
   "name": "@lunar/provider-openai",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/openai": "latest",
+    "@ai-sdk/openai": "4.0.71",
     "@lunar/foundation": "workspace:*",
     "@lunar/provider-ai-sdk": "workspace:*"
   },

@@ -1,6 +1,6 @@
 {
   "name": "@lunar/provider-ai-sdk",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@lunar/foundation": "workspace:*",
-    "ai": "latest"
+    "ai": "7.0.107"
   }
 }

@@ -5,8 +5,8 @@
     "": {
       "name": "lunar-adk",
       "devDependencies": {
-        "@types/bun": "latest",
-        "typescript": "^5",
+        "@types/bun": "1.4.0",
+        "typescript": "5.9.3",
       },
     },
     "elysia": {
@@ -14,38 +14,46 @@
       "dependencies": {
         "@lunar/adk": "workspace:*",
         "@lunar/provider-openai": "workspace:*",
+        "@lunar/storage-sqlite": "workspace:*",
         "elysia": "latest",
       },
     },
     "packages/adk": {
       "name": "@lunar/adk",
-      "version": "0.0.1",
+      "version": "1.0.0",
       "dependencies": {
         "@lunar/foundation": "workspace:*",
       },
     },
     "packages/foundation": {
       "name": "@lunar/foundation",
-      "version": "0.0.1",
+      "version": "1.0.0",
     },
     "packages/provider-ai-sdk": {
       "name": "@lunar/provider-ai-sdk",
-      "version": "0.0.1",
+      "version": "1.0.0",
       "dependencies": {
         "@lunar/foundation": "workspace:*",
-        "ai": "latest",
+        "ai": "7.0.107",
       },
     },
     "packages/provider-openai": {
       "name": "@lunar/provider-openai",
-      "version": "0.0.1",
+      "version": "1.0.0",
       "dependencies": {
-        "@ai-sdk/openai": "latest",
+        "@ai-sdk/openai": "4.0.71",
         "@lunar/foundation": "workspace:*",
         "@lunar/provider-ai-sdk": "workspace:*",
       },
       "devDependencies": {
         "@lunar/adk": "workspace:*",
+      },
+    },
+    "packages/storage-sqlite": {
+      "name": "@lunar/storage-sqlite",
+      "version": "1.0.0",
+      "dependencies": {
+        "@lunar/foundation": "workspace:*",
       },
     },
   },
@@ -69,6 +77,8 @@
     "@lunar/provider-ai-sdk": ["@lunar/provider-ai-sdk@workspace:packages/provider-ai-sdk"],
 
     "@lunar/provider-openai": ["@lunar/provider-openai@workspace:packages/provider-openai"],
+
+    "@lunar/storage-sqlite": ["@lunar/storage-sqlite@workspace:packages/storage-sqlite"],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.34.52", "", {}, "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw=="],
 

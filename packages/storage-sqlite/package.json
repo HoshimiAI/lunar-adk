@@ -1,10 +1,9 @@
 {
-  "name": "@lunar/adk",
+  "name": "@lunar/storage-sqlite",
   "version": "1.0.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./experimental": "./src/experimental.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "test": "bun test",

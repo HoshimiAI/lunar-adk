@@ -5,16 +5,16 @@ export interface ModelCapabilities {
   structuredOutput?: boolean;
 }
 
-export interface ModelMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
 export interface ModelToolCall {
   id: string;
   name: string;
   input: unknown;
 }
+
+export type ModelMessage =
+  | { role: "user" | "system"; content: string }
+  | { role: "assistant"; content: string; toolCalls?: ModelToolCall[] }
+  | { role: "tool"; toolCallId: string; content: string };
 
 export interface ModelResponse {
   text: string;

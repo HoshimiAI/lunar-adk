@@ -2,7 +2,7 @@ export { createRuntime } from "./runtime";
 export type { RuntimeConfig, RuntimeHandle } from "./runtime";
 
 export { AgentRunError, defineAgent } from "./agent";
-export type { Agent, AgentConfig, AgentRunOptions, AgentRunResult } from "./agent";
+export type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentErrorCode } from "./agent";
 
 export { defineTool } from "./tool";
 export type { Tool, ToolResult, ToolPermission } from "./tool";
@@ -26,7 +26,7 @@ export type { Workflow, WorkflowConfig, WorkflowStep } from "./workflow";
 export { createMemory } from "./memory";
 export type { MemoryProvider } from "./memory";
 
-export type { Run, RunStatus } from "./run";
+export type { Run, RunStatus, PendingApproval, RunContinuation } from "./run";
 export { InMemoryRunStore } from "./run";
 export type { RunStore } from "./run";
 export { createSession, InMemorySessionStore } from "./session";

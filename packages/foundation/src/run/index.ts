@@ -1,10 +1,10 @@
-export { createRun, startRun, completeRun, failRun, appendEvent } from "./lifecycle";
+export { createRun, startRun, completeRun, failRun, cancelRun, pauseRun, appendEvent } from "./lifecycle";
 export { addUsage } from "./usage";
 export { inspectRun } from "./inspect";
 export { replayEvents } from "./replay";
 export { forkRun } from "./fork";
 export { compareRuns } from "./compare";
-export type { Run, RunStatus, RunUsage } from "./types";
+export type { Run, RunStatus, RunUsage, PendingApproval, RunContinuation } from "./types";
 export { InMemoryRunStore } from "./store";
 export type { RunStore } from "./store";
 export type { TraceSpan } from "./trace";
