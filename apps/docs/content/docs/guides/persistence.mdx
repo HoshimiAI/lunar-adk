@@ -1,0 +1,29 @@
+---
+title: Persistence
+description: Store runs, sessions, and workflow state in SQLite
+---
+
+The runtime uses in-memory stores by default. For a Bun service, use
+`@lunar/storage-sqlite` to persist runs, sessions, and workflow runs:
+
+```ts
+import { createRuntime } from '@lunar/adk';
+import { createSqliteStores } from '@lunar/storage-sqlite';
+
+const storage = createSqliteStores(process.env.SQLITE_PATH ?? 'lunar.db');
+const runtime = await createRuntime({
+  runStore: storage.runStore,
+  sessionStore: storage.sessionStore,
+  workflowStore: storage.workflowStore,
+});
+
+// Call storage.close() during application shutdown.
+```
+
+`createSqliteStores()` accepts a database path or an existing Bun SQLite
+`Database`. It returns the database handle, `SqliteRunStore`,
+`SqliteSessionStore`, `SqliteWorkflowStore`, and `close()`.
+
+The adapter initializes its tables and schema version automatically. It stores
+records as JSON and supports the `get()` and `save()` methods required by the
+foundation store interfaces. Use `:memory:` for isolated tests.

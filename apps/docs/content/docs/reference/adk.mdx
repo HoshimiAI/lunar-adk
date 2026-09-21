@@ -1,0 +1,73 @@
+---
+title: "API: @lunar/adk"
+description: Stable application-facing Lunar ADK exports
+---
+
+The stable facade re-exports the APIs most applications need:
+
+| Export | Purpose |
+| --- | --- |
+| `createRuntime` | Compose agents, stores, events, and workflows |
+| `defineAgent` | Create a model-backed agent |
+| `defineTool` | Create a typed tool with validation and execution |
+| `defineModelProvider` | Mark a provider as a foundation model provider |
+| `createSession` | Create an empty session |
+| `defineWorkflow` | Create a resumable workflow |
+| `InMemoryRunStore`, `InMemorySessionStore`, `InMemoryWorkflowStore` | Development stores |
+| `AgentRunError`, `WorkflowApprovalRequired` | Execution and approval errors |
+
+## `createRuntime(config?)`
+
+Returns a promise for a `RuntimeHandle`. Configure optional `plugins`,
+`runStore`, `sessionStore`, and `workflowStore`; omitted stores are in-memory.
+
+The handle exposes `run`, `stream`, `supportsStreaming`, `steer`, `approve`,
+`reject`, `cancel`, `getRun`, `getStoredRun`, `getSession`, `on`,
+`registerAgent`, `registerWorkflow`, `runWorkflow`, `getWorkflowRun`,
+`resumeWorkflow`, and `cancelWorkflow`.
+
+### Runtime methods
+
+- `run(agentName, input, options?)` executes an agent and returns output plus
+  its run record.
+- `supportsStreaming(agentName)` reports whether the registered model streams.
+- `stream(agentName, input, options?)` yields runtime stream events.
+- `steer(sessionId, instruction)` updates an idle session or interrupts its
+  active run and returns continuation IDs.
+- `approve(runId, approvalId)` resumes an approval-gated tool call.
+- `reject(runId, approvalId)` rejects a pending tool call.
+- `cancel(runId)` cancels an active run, returning `undefined` when not found.
+- `getRun(runId)` reads the in-process run map; `getStoredRun(runId)` reads the
+  configured store.
+- `getSession(sessionId)` reads a stored session.
+- `on(event, handler)` subscribes to an event and returns an unsubscribe
+  function.
+- `registerAgent(agent)` and `registerWorkflow(workflow)` add runtime behavior.
+- `runWorkflow(name, input?)` starts a workflow.
+- `getWorkflowRun(id)` reads a workflow run.
+- `resumeWorkflow(id, approvalId?)` resumes a waiting workflow.
+- `cancelWorkflow(id)` cancels a workflow and returns its final record.
+
+## `defineAgent(config, eventBus?)`
+
+Accepts `name`, `model`, optional `systemPrompt`, `tools`,
+`maxToolRoundtrips`, `retryPolicy`, and `maxContextTokens`. Returns an `Agent`
+with `run(input, options?)`.
+
+## `defineTool<Input, Output>(tool)`
+
+Returns the supplied tool contract. A tool contains `name`, `description`, a
+schema with `parse()` and `toJSONSchema()`, an optional approval permission, and
+an `execute(input)` function.
+
+## `defineWorkflow(config)`
+
+Accepts `name` and either an async `run(context)` function or a declarative
+`root` step tree. `version` defaults to `"1"`.
+
+## Common types
+
+The facade exports `Agent`, `AgentConfig`, `AgentRunOptions`, `AgentRunResult`,
+`Tool`, `ToolResult`, `ModelProvider`, `ModelResponse`, `ModelStreamPart`,
+`Run`, `Session`, `Workflow`, `WorkflowRun`, and their related status and store
+types. See the concept guides for behavior and examples.

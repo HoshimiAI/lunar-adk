@@ -1,0 +1,86 @@
+---
+title: "HTTP API: Elysia"
+description: Use the reference Bun HTTP service and its SSE stream
+---
+
+The example service in `apps/elysia` exposes a JSON API backed by an assistant
+agent. Start it with `bun --cwd apps/elysia run dev`; the default base URL is
+`http://localhost:3000`.
+
+The adapter exports two factories:
+
+- `createApp(runtime)` builds the Elysia app around an existing
+  `RuntimeHandle`, which is useful for tests and custom deployments.
+- `createDefaultApp()` creates SQLite storage, configures the OpenAI assistant,
+  installs the example tools, and closes storage from the app shutdown hook.
+
+All JSON requests use `content-type: application/json`. Input strings must be
+1–32,000 characters, and steering instructions must be 1–4,000 characters.
+
+## Health
+
+`GET /health` returns `{ "name": "lunar-elysia", "status": "ok" }`.
+
+## Run an assistant
+
+`POST /run`
+
+```json
+{ "input": "Explain why Bun is useful", "sessionId": "optional-session-id" }
+```
+
+Returns `{ output, runId, sessionId, status, pendingApproval }`. Use the
+returned session ID to continue a conversation.
+
+## Stream an assistant
+
+`POST /run/stream` accepts the same body and returns `text/event-stream`. The
+SSE event names are:
+
+- runtime lifecycle event names such as `run.started` and `tool.completed`;
+- `text.delta` with `{ runId, text }`;
+- `stream.completed` with output, run, session, status, and approval data;
+- `stream.interrupted` with continuation IDs;
+- `stream.error` with `error`, and optional `runId` and `code`.
+
+The endpoint returns `501` with `STREAMING_UNSUPPORTED` when the configured
+model cannot stream.
+
+## Runs and approvals
+
+| Method | Route | Result |
+| --- | --- | --- |
+| `GET` | `/runs/:id` | Stored run; `404` if absent |
+| `POST` | `/runs/:id/cancel` | Cancelled run; `404` if absent |
+| `POST` | `/runs/:id/approve` | `{ runId, status, output, pendingApproval }` |
+| `POST` | `/runs/:id/reject` | Updated run |
+
+Approval requests use `{ "approvalId": "..." }`. Invalid or no-longer-pending
+approvals return `409`.
+
+## Sessions and steering
+
+`GET /sessions/:id` returns the session or `404`.
+
+`POST /sessions/:id/steer` accepts `{ "instruction": "..." }`. It returns
+`{ sessionId, steered: true }` when no run is active, or `202` with
+`{ status: "accepted", interruptedRunId, continuationRunId, sessionId }` when
+an active run is interrupted.
+
+## Workflows
+
+| Method | Route | Body / result |
+| --- | --- | --- |
+| `POST` | `/workflows/:name/run` | Optional `{ input }`; returns workflow run ID and status |
+| `GET` | `/workflow-runs/:id` | Returns the workflow run or `404` |
+| `POST` | `/workflow-runs/:id/cancel` | Returns the cancelled run |
+| `POST` | `/workflow-runs/:id/resume` | Optional `{ approvalId }`; resumes approval |
+
+Unknown workflows and missing workflow runs return `404`. A workflow that is
+waiting for approval returns its pending approval in the run response.
+
+## Errors
+
+Validation errors return `422` with `{ error: "Invalid request", details }`.
+Missing resources return `404`; cancelled agent runs return `409`; unexpected
+agent errors return `500` with the affected `runId`.

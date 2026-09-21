@@ -1,0 +1,45 @@
+---
+title: "Use case: durable agent"
+description: Recover long-running agent work across restarts
+---
+
+```ts
+import { createRuntime, defineWorkflow } from '@lunar/adk';
+import { createSqliteStores } from '@lunar/storage-sqlite';
+```
+
+Durability comes from pairing the runtime with persistent stores and making
+long-running work resumable.
+
+```ts
+const storage = createSqliteStores('lunar.db');
+const runtime = await createRuntime({
+  runStore: storage.runStore,
+  sessionStore: storage.sessionStore,
+  workflowStore: storage.workflowStore,
+});
+```
+
+Use normal agent runs for conversational turns. Use workflows for jobs that
+contain multiple stages:
+
+```ts
+runtime.registerWorkflow(defineWorkflow({
+  name: 'research',
+  run: async (ctx) => {
+    const previous = ctx.resumeFrom?.state;
+    const result = previous?.output
+      ? { output: String(previous.output) }
+      : await ctx.runSubAgent('researcher', 'Collect the source material');
+
+    await ctx.checkpoint('research-complete', { output: result.output });
+    return result.output;
+  },
+}));
+```
+
+On restart, load the workflow run by ID and call `resumeWorkflow()`. The
+latest checkpoint is exposed as `ctx.resumeFrom`; workflow code should use it
+to make completed stages idempotent. Store external side effects with their
+own idempotency key because SQLite persistence alone cannot undo an external
+operation.

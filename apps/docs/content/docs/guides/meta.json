@@ -1,0 +1,11 @@
+{
+  "title": "Guides",
+  "pages": [
+    "getting-started",
+    "agents-and-tools",
+    "models-and-providers",
+    "runs-and-sessions",
+    "workflows",
+    "persistence"
+  ]
+}

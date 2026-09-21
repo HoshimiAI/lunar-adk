@@ -1,0 +1,48 @@
+---
+title: Models and providers
+description: Configure provider-neutral model capabilities
+---
+
+Lunar ADK agents depend on the small `ModelProvider` contract rather than a
+specific vendor SDK. A provider exposes an `id`, capability flags, `call()`,
+and optionally `stream()`.
+
+## OpenAI
+
+```ts
+import { createOpenAIModelProvider } from '@lunar/provider-openai';
+
+const model = createOpenAIModelProvider({
+  model: process.env.OPENAI_MODEL ?? 'gpt-5-mini',
+  apiKey: process.env.OPENAI_API_KEY,
+});
+```
+
+Optional settings include `id`, `baseURL`, `organization`, `project`, custom
+headers, a custom `fetch`, and capability overrides.
+
+## AI SDK adapter
+
+Use `@lunar/provider-ai-sdk` when the application already has an AI SDK
+`LanguageModel`:
+
+```ts
+import { createAISDKModelProvider } from '@lunar/provider-ai-sdk';
+
+const model = createAISDKModelProvider({
+  id: 'my-provider:model',
+  model: languageModel,
+  capabilities: { streaming: true, tools: true },
+});
+```
+
+The adapter normalizes text, tool calls, usage, abort signals, and streamed
+text deltas into the foundation model contract.
+
+## Custom providers
+
+Implement `ModelProvider` when the model is hosted elsewhere. `call()` returns
+the final text, normalized tool calls, and token usage. `stream()` yields
+`text-delta` parts followed by one `response` part. Set capabilities only for
+features the provider actually supports; the runtime uses them to determine
+whether tools and streaming are available.

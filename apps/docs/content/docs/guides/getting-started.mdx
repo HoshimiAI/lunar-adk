@@ -1,0 +1,47 @@
+---
+title: Getting started
+description: Install Lunar ADK and create your first runtime
+---
+
+## Install
+
+Lunar ADK targets Bun and TypeScript. Install the stable application-facing
+package in an existing project:
+
+```bash
+bun add @lunar/adk
+```
+
+For the OpenAI adapter, also install:
+
+```bash
+bun add @lunar/provider-openai
+```
+
+## Create a runtime
+
+```ts
+import { createRuntime, defineAgent } from '@lunar/adk';
+import { createOpenAIModelProvider } from '@lunar/provider-openai';
+
+const runtime = await createRuntime();
+runtime.registerAgent(defineAgent({
+  name: 'assistant',
+  model: createOpenAIModelProvider({
+    model: process.env.OPENAI_MODEL ?? 'gpt-5-mini',
+    apiKey: process.env.OPENAI_API_KEY,
+  }),
+  systemPrompt: 'Be concise and helpful.',
+}));
+```
+
+Keep `OPENAI_API_KEY` in your environment rather than committing it to source
+control. The runtime is provider-neutral, so adapters can be replaced without
+changing agent or tool definitions.
+
+## Where to go next
+
+- Read [agents and tools](/docs/guides/agents-and-tools) to understand agents, tools, runs, and
+  workflows.
+- Explore the [Elysia example](https://github.com/HoshimiAI/lunar-adk/tree/main/apps/elysia)
+  for an HTTP API.

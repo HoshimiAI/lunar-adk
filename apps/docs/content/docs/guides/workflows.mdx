@@ -1,0 +1,46 @@
+---
+title: Workflows
+description: Compose resumable steps, approvals, and managed subagents
+---
+
+Define a workflow with a name, optional version, and an async `run` function:
+
+```ts
+import { defineWorkflow } from '@lunar/adk';
+
+const research = defineWorkflow({
+  name: 'research',
+  version: '1',
+  run: async (ctx) => {
+    const analyst = await ctx.runSubAgent('analyst', 'Analyze the topic');
+    await ctx.checkpoint('analysis-complete', { output: analyst.output });
+    return analyst.output;
+  },
+});
+
+runtime.registerWorkflow(research);
+const run = await runtime.runWorkflow('research', { topic: 'Bun' });
+```
+
+## Context capabilities
+
+Workflow context provides:
+
+- `input`, `state`, `signal`, and the current workflow `run`;
+- `checkpoint(name, state)` for durable restart points;
+- `resumeFrom` for the latest checkpoint after resumption;
+- `runSubAgent(agent, input, options)` for child agent runs;
+- `parallel(tasks)` for concurrent independent work;
+- `requestApproval(id, message)` for human-in-the-loop pauses.
+
+## Approval and resumption
+
+When a workflow requests approval, its status becomes `waiting_approval` and
+the run exposes `pendingApproval`. Call `resumeWorkflow(id, approvalId)` after
+the decision. Approved IDs are retained so a resumed workflow does not repeat a
+completed approval. Use `cancelWorkflow(id)` to stop a pending or running
+workflow.
+
+Workflows can also be built from `sequential`, `parallel`, `conditional`, and
+approval steps when a declarative `WorkflowStep` tree is more useful than a
+custom `run` function.

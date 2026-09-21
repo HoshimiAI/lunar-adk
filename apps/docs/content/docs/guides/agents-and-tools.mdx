@@ -1,0 +1,58 @@
+---
+title: Agents and tools
+description: Define model-backed agents and safe application capabilities
+---
+
+## Agents
+
+An agent combines a model provider, instructions, tools, and execution limits.
+Create one with `defineAgent` and register it with a runtime:
+
+```ts
+import { createRuntime, defineAgent, defineTool } from '@lunar/adk';
+import { createOpenAIModelProvider } from '@lunar/provider-openai';
+
+const calculator = defineTool({
+  name: 'calculate',
+  description: 'Evaluate an arithmetic expression.',
+  schema: {
+    parse(input: unknown) {
+      if (!input || typeof input !== 'object') throw new Error('Invalid input');
+      return input as { expression: string };
+    },
+    toJSONSchema: () => ({
+      type: 'object',
+      properties: { expression: { type: 'string' } },
+      required: ['expression'],
+    }),
+  },
+  execute: ({ expression }) => expression,
+});
+
+const runtime = await createRuntime();
+runtime.registerAgent(defineAgent({
+  name: 'assistant',
+  model: createOpenAIModelProvider({ model: 'gpt-5-mini' }),
+  tools: [calculator],
+}));
+```
+
+The agent API supports system prompts, tool
+round-trip limits, retry policies, context budgets, cancellation, and
+streaming callbacks.
+
+## Tools
+
+Tools are explicit capabilities. Each tool has a name, description, schema, and
+executor. The schema must validate input and expose `toJSONSchema()` so model
+providers can advertise the tool to the model.
+
+Set `permission: { requiresApproval: true }` for side effects that require a
+user decision. An approved tool call resumes the same run with its pending
+approval metadata.
+
+## Cancellation and errors
+
+Pass an `AbortSignal` through `AgentRunOptions.signal` to cancel a run. A
+cancelled run records `status: "cancelled"`; failures are represented by
+`AgentRunError` and retain the associated run for inspection.

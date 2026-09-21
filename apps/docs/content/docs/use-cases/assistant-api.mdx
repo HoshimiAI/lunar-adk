@@ -1,0 +1,44 @@
+---
+title: "Use case: assistant API"
+description: Build a conversational JSON and streaming API with Elysia
+---
+
+This use case combines an OpenAI provider, an agent, SQLite stores, and the
+Elysia adapter into a service that supports multi-turn conversations.
+
+## Runtime setup
+
+```ts
+import { createRuntime, defineAgent } from '@lunar/adk';
+import { createOpenAIModelProvider } from '@lunar/provider-openai';
+import { createSqliteStores } from '@lunar/storage-sqlite';
+
+const storage = createSqliteStores(process.env.SQLITE_PATH ?? 'lunar.db');
+const runtime = await createRuntime({
+  runStore: storage.runStore,
+  sessionStore: storage.sessionStore,
+});
+
+runtime.registerAgent(defineAgent({
+  name: 'assistant',
+  model: createOpenAIModelProvider({
+    model: process.env.OPENAI_MODEL ?? 'gpt-5-mini',
+    apiKey: process.env.OPENAI_API_KEY,
+  }),
+  systemPrompt: 'Be concise, accurate, and helpful.',
+}));
+```
+
+Expose `runtime.run()` from a JSON route and `runtime.stream()` from an SSE
+route. Return the run and session IDs to clients so they can continue the same
+conversation, inspect execution state, or cancel an active run.
+
+## Client flow
+
+1. `POST /run` with an input creates a run and returns `sessionId`.
+2. Send that session ID with the next `/run` request to preserve history.
+3. Use `/sessions/:id` to render conversation state.
+4. Use `/run/stream` when the UI needs incremental text.
+5. Use `/runs/:id/cancel` when a user stops generation.
+
+Close the SQLite stores from the server shutdown hook.

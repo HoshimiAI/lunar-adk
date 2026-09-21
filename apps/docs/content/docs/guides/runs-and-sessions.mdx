@@ -1,0 +1,52 @@
+---
+title: Runs and sessions
+description: Persist, inspect, continue, and steer agent executions
+---
+
+## Runs
+
+A run is one agent execution. It records its status, timestamps, model and
+agent identifiers, lifecycle events, trace spans, artifacts, token usage,
+result, errors, and any pending approval.
+
+```ts
+const result = await runtime.run('assistant', 'Summarize this report', {
+  sessionId,
+});
+
+console.log(result.output, result.run.id, result.run.status);
+```
+
+Use `getRun()` for the in-process record or `getStoredRun()` for the configured
+run store. `cancel()`, `approve()`, and `reject()` operate on run IDs.
+
+## Sessions
+
+A session is the durable multi-turn container joining conversation history and
+related runs. Pass its ID to later `runtime.run()` calls to continue context.
+
+```ts
+const first = await runtime.run('assistant', 'My name is Ada');
+const second = await runtime.run('assistant', 'What is my name?', {
+  sessionId: first.run.sessionId,
+});
+```
+
+`getSession()` returns the stored session, including its model messages and run
+records. Use `steer(sessionId, instruction)` to change the next turn. If a run
+is active, steering returns the interrupted and continuation run IDs.
+
+## Streaming
+
+Call `runtime.stream()` to consume `RuntimeStreamEvent` values:
+
+```ts
+for await (const event of runtime.stream('assistant', 'Explain Bun')) {
+  if (event.type === 'text.delta') process.stdout.write(event.text);
+  if (event.type === 'stream.completed') console.log(event.result.run.id);
+}
+```
+
+Possible events are model lifecycle events, `text.delta`, `stream.completed`,
+`stream.interrupted`, and `stream.error`. Check
+`runtime.supportsStreaming(agentName)` before exposing a streaming endpoint.

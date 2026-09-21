@@ -1,0 +1,47 @@
+---
+title: "API: providers and storage"
+description: Configure model adapters and SQLite persistence
+---
+
+## `createOpenAIModelProvider(options)`
+
+Package: `@lunar/provider-openai`
+
+Required option:
+
+- `model`: the OpenAI model name.
+
+Optional options are `id`, `apiKey`, `baseURL`, `organization`, `project`,
+`headers`, `name`, `fetch`, and `capabilities`. It returns a foundation
+`ModelProvider` with tool calling, structured output, and streaming enabled by
+default.
+
+```ts
+const model = createOpenAIModelProvider({
+  model: 'gpt-5-mini',
+  apiKey: process.env.OPENAI_API_KEY,
+});
+```
+
+## `createAISDKModelProvider(options)`
+
+Package: `@lunar/provider-ai-sdk`
+
+Accepts `id`, an AI SDK `LanguageModel`, and optional capability overrides. It
+maps AI SDK text, tool calls, usage, and abort signals to the Lunar provider
+contract.
+
+## `createSqliteStores(database?)`
+
+Package: `@lunar/storage-sqlite`
+
+Accepts a SQLite path or Bun `Database`, defaulting to `lunar.db`. Returns:
+
+- `database`: the opened database;
+- `runStore`: durable run storage;
+- `sessionStore`: durable session storage;
+- `workflowStore`: durable workflow-run storage;
+- `close()`: closes the database.
+
+The package also exports `SqliteRunStore`, `SqliteSessionStore`,
+`SqliteWorkflowStore`, and `SQLITE_SCHEMA_VERSION`.

@@ -1,0 +1,51 @@
+---
+title: "Use case: approval workflow"
+description: Pause side effects for human approval and resume safely
+---
+
+Use tool or workflow approvals when an agent can prepare an action but a person
+must authorize it before execution.
+
+## Tool approval
+
+```ts
+const sendEmail = defineTool({
+  name: 'send_email',
+  description: 'Send an email to a recipient.',
+  permission: { requiresApproval: true },
+  schema: emailSchema,
+  execute: sendEmailImplementation,
+});
+```
+
+When the agent requests the tool, the run becomes `waiting_approval` and
+contains `pendingApproval.id` and `pendingApproval.toolCallId`. Display the
+request to the user, then call:
+
+```ts
+const result = await runtime.approve(runId, approvalId);
+// result.run.status === 'completed' when the continuation finishes
+```
+
+Call `runtime.reject(runId, approvalId)` to end the pending run without running
+the tool.
+
+## Workflow approval
+
+```ts
+const deployment = defineWorkflow({
+  name: 'deployment',
+  run: async (ctx) => {
+    const plan = await ctx.runSubAgent('planner', 'Prepare the deployment plan');
+    await ctx.requestApproval('deploy-production', `Deploy ${plan.output}?`);
+    return deploy(plan.output);
+  },
+});
+
+runtime.registerWorkflow(deployment);
+```
+
+Run it with `runWorkflow()`. When it pauses, persist the workflow run ID and
+approval ID. Resume with `resumeWorkflow(workflowRunId, approvalId)` after the
+decision. Checkpoints and approved IDs prevent already completed work from
+being repeated.

@@ -1,0 +1,133 @@
+---
+title: "API: @lunar/foundation"
+description: Complete reference for foundation helpers and subpath modules
+---
+
+`@lunar/adk` is the recommended application facade. Use these subpath exports
+when building adapters, persistence, plugins, evaluation tooling, or advanced
+runtime integrations.
+
+## Agent
+
+Package: `@lunar/foundation/agent`
+
+- `defineAgent(config, eventBus?)` creates an `Agent` from a model, prompt,
+  tools, retry policy, and context limits.
+- `runSubAgent(agent, input, options?)` executes an agent as a child run.
+- `withRetry(operation, policy?)` retries an async operation according to a
+  retry policy; `defaultRetryPolicy` provides the default policy.
+- `createCancellation()` returns an abort controller and signal pair for
+  cooperative cancellation.
+- `throwIfAborted(signal?)` throws when an optional signal is already aborted.
+- `canTransition(from, to)` checks whether an `AgentState` transition is valid.
+- `AgentRegistry` registers and resolves agents by name.
+- `AgentRunError` contains the failed run and its `AgentErrorCode`.
+
+## Tool
+
+Package: `@lunar/foundation/tool`
+
+- `defineTool(tool)` preserves a typed tool definition.
+- `executeTool(tool, input)` validates and executes a tool, returning its
+  normalized result or error.
+- `needsApproval(tool)` reports whether the tool requires approval.
+- `schemaToJSON(schema)` converts a schema adapter into JSON Schema.
+- `ToolRegistry` registers and resolves tools by name.
+
+## Model
+
+Package: `@lunar/foundation/model`
+
+- `defineModelProvider(provider)` preserves a `ModelProvider` contract.
+- `supports(capabilities, feature)` checks a model capability flag.
+- `ModelRegistry` registers and resolves providers by ID.
+
+## Context
+
+Package: `@lunar/foundation/context`
+
+- `buildContext(messages, budget)` selects recent messages until the estimated
+  token budget is satisfied.
+- `estimateTokens(text)` estimates tokens for a text value.
+- `selectRecent(messages, limit)` retains the most recent messages.
+- `truncate(message, maxChars)` limits message content to a character budget.
+- `shapeToolResult(result)` formats a tool result for model context.
+
+## Workflow
+
+Package: `@lunar/foundation/workflow`
+
+- `defineWorkflow(config)` creates a workflow from a custom runner or root step.
+- `sequential(steps)` creates a sequential workflow step.
+- `parallel(steps)` creates a parallel workflow step.
+- `conditional(condition, ifTrue, ifFalse?)` creates a conditional step.
+- `executeStep(step, approve?)` executes a declarative workflow step tree.
+- `autoApprove` is the default approval handler for standalone step execution.
+- `InMemoryWorkflowStore` stores workflow runs in memory.
+- `WorkflowApprovalRequired` signals a pending workflow approval.
+
+## Runs and traces
+
+Package: `@lunar/foundation/run`
+
+- `createRun(metadata?)` creates a pending run.
+- `startRun(run)` marks a run as running.
+- `completeRun(run, result)` completes a run with a result.
+- `failRun(run, error, errorCode?)` records a failure.
+- `cancelRun(run, error?)` records cancellation.
+- `pauseRun(run, approval, continuation)` records a pending tool approval.
+- `appendEvent(run, event)` adds a lifecycle event.
+- `addUsage(run, delta)` accumulates token usage.
+- `inspectRun(run)` returns an inspection summary.
+- `replayEvents(run, onEvent)` replays recorded events in order.
+- `forkRun(run)` creates a continuation copy with a new ID.
+- `compareRuns(a, b)` compares two run results and usage values.
+- `InMemoryRunStore` stores runs in memory.
+- `startSpan(name, metadata?)` and `endSpan(span)` manage trace spans through
+  `@lunar/foundation/run` trace exports.
+
+## Sessions
+
+Package: `@lunar/foundation/session`
+
+- `createSession()` creates an empty session with a generated ID.
+- `appendMessage(session, message)` returns a session with a new message.
+- `appendRun(session, run)` returns a session with an additional run.
+- `upsertRun(session, run)` replaces or adds a run by ID.
+- `InMemorySessionStore` stores sessions in memory.
+
+## Memory and evaluation
+
+Packages: `@lunar/foundation/memory`, `@lunar/foundation/evaluation`
+
+- `createMemory(provider)` preserves a `MemoryProvider`.
+- `createInMemoryProvider(id?)` creates a simple in-memory memory provider.
+- `MemoryRegistry` registers memory providers.
+- `defineEvaluator(evaluator)` preserves an evaluator definition.
+- `normalize(score)` normalizes an evaluation score.
+- `EvaluatorRegistry` registers evaluators.
+
+## Plugins and events
+
+Package: `@lunar/foundation/plugin`
+
+- `definePlugin(plugin)` preserves a plugin definition.
+- `installPlugin(plugin, context)` installs a plugin and runs its lifecycle.
+- `resolveOrder(plugins)` resolves plugin dependency order.
+- `assertPermission(granted, needed)` throws when a plugin lacks permission.
+- `PluginRegistry`, `CommandRegistry`, and `SchemaRegistry` manage registered
+  plugins and plugin-provided capabilities.
+
+Package: `@lunar/foundation/event`
+
+- `EventBus` subscribes to and emits typed runtime events.
+- `EVENT_NAMES` contains the supported event names.
+
+## Result helpers
+
+Package: `@lunar/foundation/types`
+
+- `ok(value)` creates a successful `Result`.
+- `err(error)` creates a failed `Result`.
+
+The module also exports `Result`, `JSONSchema`, `SchemaLike`, and `Brand` types.
