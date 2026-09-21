@@ -2,6 +2,7 @@ export const EVENT_NAMES = [
   "run.started",
   "run.completed",
   "run.failed",
+  "model.called",
   "agent.started",
   "agent.completed",
   "agent.failed",

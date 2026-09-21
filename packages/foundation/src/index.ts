@@ -1,11 +1,21 @@
 export { createRuntime } from "./runtime";
 export type { RuntimeConfig, RuntimeHandle } from "./runtime";
 
-export { defineAgent } from "./agent";
-export type { Agent, AgentConfig, AgentRunResult } from "./agent";
+export { AgentRunError, defineAgent } from "./agent";
+export type { Agent, AgentConfig, AgentRunOptions, AgentRunResult } from "./agent";
 
 export { defineTool } from "./tool";
-export type { Tool, ToolResult } from "./tool";
+export type { Tool, ToolResult, ToolPermission } from "./tool";
+
+export { defineModelProvider } from "./model";
+export type {
+  ModelProvider,
+  ModelCapabilities,
+  ModelMessage,
+  ModelToolCall,
+  ModelResponse,
+  ModelCallOptions,
+} from "./model";
 
 export { definePlugin } from "./plugin";
 export type { Plugin, PluginContext } from "./plugin";
@@ -17,4 +27,8 @@ export { createMemory } from "./memory";
 export type { MemoryProvider } from "./memory";
 
 export type { Run, RunStatus } from "./run";
+export { InMemoryRunStore } from "./run";
+export type { RunStore } from "./run";
+export { createSession, InMemorySessionStore } from "./session";
+export type { Session, SessionStore } from "./session";
 export type { LunarEvent, EventName } from "./event";

@@ -14,7 +14,7 @@ export interface Bootstrapped {
   events: EventBus;
 }
 
-export async function bootstrap(config: Required<RuntimeConfig>): Promise<Bootstrapped> {
+export async function bootstrap(config: Required<Pick<RuntimeConfig, "plugins">>): Promise<Bootstrapped> {
   const agents = new AgentRegistry();
   const tools = new ToolRegistry();
   const memory = new MemoryRegistry();

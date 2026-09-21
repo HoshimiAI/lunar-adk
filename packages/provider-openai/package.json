@@ -1,0 +1,21 @@
+{
+  "name": "@lunar/provider-openai",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "test:live": "RUN_LIVE_TESTS=1 bun test src/live.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "latest",
+    "@lunar/foundation": "workspace:*",
+    "@lunar/provider-ai-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@lunar/adk": "workspace:*"
+  }
+}

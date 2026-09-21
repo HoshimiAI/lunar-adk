@@ -1,0 +1,15 @@
+{
+  "name": "@lunar/adk",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lunar/foundation": "workspace:*"
+  }
+}

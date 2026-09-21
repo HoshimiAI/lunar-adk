@@ -19,12 +19,14 @@ export interface ModelToolCall {
 export interface ModelResponse {
   text: string;
   toolCalls: ModelToolCall[];
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
 export interface ModelCallOptions {
   messages: ModelMessage[];
   system?: string;
   tools?: { name: string; description: string; inputSchema: unknown }[];
+  signal?: AbortSignal;
 }
 
 export interface ModelProvider {

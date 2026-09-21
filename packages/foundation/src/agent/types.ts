@@ -1,6 +1,8 @@
 import type { ModelProvider } from "../model";
 import type { Tool } from "../tool";
+import type { ModelMessage } from "../model";
 import type { Run } from "../run";
+import type { RetryPolicy } from "./retry";
 
 export type AgentState = "idle" | "running" | "waiting" | "done" | "error";
 
@@ -10,6 +12,14 @@ export interface AgentConfig {
   systemPrompt?: string;
   tools?: Tool<any, any>[];
   maxToolRoundtrips?: number;
+  retryPolicy?: RetryPolicy;
+  maxContextTokens?: number;
+}
+
+export interface AgentRunOptions {
+  signal?: AbortSignal;
+  history?: ModelMessage[];
+  sessionId?: string;
 }
 
 export interface AgentRunResult {
@@ -19,5 +29,5 @@ export interface AgentRunResult {
 
 export interface Agent {
   name: string;
-  run(input: string): Promise<AgentRunResult>;
+  run(input: string, options?: AgentRunOptions): Promise<AgentRunResult>;
 }

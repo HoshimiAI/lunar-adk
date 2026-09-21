@@ -1,6 +1,10 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/foundation" }
+    { "path": "packages/foundation" },
+    { "path": "packages/adk" },
+    { "path": "packages/provider-ai-sdk" },
+    { "path": "packages/provider-openai" },
+    { "path": "elysia" }
   ]
 }

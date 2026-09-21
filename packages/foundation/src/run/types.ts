@@ -11,6 +11,9 @@ export interface RunUsage {
 
 export interface Run<Result = unknown> {
   id: string;
+  agent?: string;
+  model?: string;
+  sessionId?: string;
   status: RunStatus;
   startedAt: number;
   endedAt?: number;
