@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { AgentRunError, createRuntime, defineAgent } from "@lunar/adk";
+import { AgentRunError, StorageConflictError, createRuntime, defineAgent } from "@lunar/adk";
 import type { RuntimeHandle, RuntimeStreamEvent } from "@lunar/adk";
 import { createOpenAIModelProvider } from "@lunar/provider-openai";
 import { createSqliteStores } from "@lunar/storage-sqlite";
@@ -44,6 +44,10 @@ export async function createApp(runtime: RuntimeHandle) {
       if (error instanceof AgentRunError) {
         set.status = error.code === "CANCELLED" ? 409 : 500;
         return { error: error.message, runId: error.run.id };
+      }
+      if (error instanceof StorageConflictError) {
+        set.status = 409;
+        return { error: error.message, resource: error.resource, id: error.id };
       }
       if (error instanceof Error && (error.message === "Run not found" || error.message === "Session not found")) {
         set.status = 404;
@@ -250,9 +254,8 @@ export async function createDefaultApp() {
     serviceName: process.env.OTEL_SERVICE_NAME ?? "lunar-elysia",
   }));
   const runtime = await createRuntime({
-    runStore: storage.runStore,
-    sessionStore: storage.sessionStore,
-    workflowStore: storage.workflowStore,
+    storage,
+    ownsStorage: true,
     observability: {
       exporters,
       captureContent: process.env.LUNAR_TELEMETRY_CAPTURE_CONTENT === "true",
@@ -272,6 +275,5 @@ export async function createDefaultApp() {
 
   return (await createApp(runtime)).onStop(async () => {
     await runtime.shutdown?.();
-    await storage.close?.();
   });
 }

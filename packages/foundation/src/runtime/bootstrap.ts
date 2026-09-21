@@ -5,6 +5,7 @@ import { EvaluatorRegistry } from "../evaluation";
 import { EventBus } from "../event";
 import { CommandRegistry, SchemaRegistry, installPlugin, resolveOrder, type PluginContext } from "../plugin";
 import type { RuntimeConfig } from "./types";
+import type { Workflow } from "../workflow";
 
 export interface Bootstrapped {
   agents: AgentRegistry;
@@ -12,6 +13,7 @@ export interface Bootstrapped {
   memory: MemoryRegistry;
   evaluators: EvaluatorRegistry;
   events: EventBus;
+  workflows: Map<string, Workflow>;
 }
 
 export async function bootstrap(
@@ -24,6 +26,7 @@ export async function bootstrap(
   memory.register(memoryProvider ?? createInMemoryProvider());
   const evaluators = new EvaluatorRegistry();
   const events = new EventBus();
+  const workflows = new Map<string, Workflow>();
 
   const ctx: PluginContext = {
     agents,
@@ -31,7 +34,14 @@ export async function bootstrap(
     memory,
     evaluators,
     events,
-    workflows: { register: () => {} },
+    workflows: {
+      register(workflowOrId: Workflow | string, run?: () => Promise<unknown>) {
+        const workflow = typeof workflowOrId === "string"
+          ? { name: workflowOrId, version: "1", run: run! }
+          : workflowOrId;
+        workflows.set(workflow.name, workflow);
+      },
+    },
     commands: new CommandRegistry(),
     schemas: new SchemaRegistry(),
   };
@@ -41,5 +51,5 @@ export async function bootstrap(
     events.emit("plugin.registered", { pluginId: plugin.id });
   }
 
-  return { agents, tools, memory, evaluators, events };
+  return { agents, tools, memory, evaluators, events, workflows };
 }

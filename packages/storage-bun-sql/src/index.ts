@@ -1,5 +1,5 @@
 import { SQL } from "bun";
-import type { Run, RunStore, Session, SessionStore, StorageBundle, WorkflowRun, WorkflowStore } from "@lunar/foundation";
+import { StorageConflictError, type Run, type RunStore, type Session, type SessionStore, type StorageBundle, type WorkflowRun, type WorkflowStore, type SaveOptions } from "@lunar/foundation";
 
 export type BunSqlDialect = "postgres" | "mysql" | "sqlite";
 
@@ -8,7 +8,7 @@ export interface BunSqlStorageOptions {
   dialect?: BunSqlDialect;
 }
 
-type StoredRecord = { id: string };
+type StoredRecord = { id: string; revision?: number };
 
 function inferDialect(connection: string): BunSqlDialect {
   const value = connection.toLowerCase();
@@ -29,19 +29,26 @@ class BunSqlStore<T extends StoredRecord> {
     private readonly resource: string,
   ) {}
 
-  async save(value: T): Promise<void> {
+  async save(value: T, options: SaveOptions = {}): Promise<T> {
     const table = quoteTable(this.resource);
+    const current = await this.get(value.id);
+    const currentRevision = (current as (StoredRecord | undefined))?.revision;
+    if (options.expectedRevision !== undefined && (currentRevision ?? 0) !== options.expectedRevision) {
+      throw new StorageConflictError(this.resource, value.id, options.expectedRevision, currentRevision);
+    }
+    const saved = { ...value, revision: ((current as (T & { revision?: number }) | undefined)?.revision ?? -1) + 1 } as T;
     if (this.dialect === "mysql") {
       await this.client.unsafe(
         `INSERT INTO ${table} (id, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)`,
-        [value.id, JSON.stringify(value)],
+        [saved.id, JSON.stringify(saved)],
       );
-      return;
+      return saved;
     }
     await this.client.unsafe(
       `INSERT INTO ${table} (id, value) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET value = excluded.value`,
-      [value.id, JSON.stringify(value)],
+      [saved.id, JSON.stringify(saved)],
     );
+    return saved;
   }
 
   async get(id: string): Promise<T | undefined> {

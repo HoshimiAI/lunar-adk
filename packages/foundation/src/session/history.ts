@@ -7,13 +7,21 @@ export function appendMessage(session: Session, message: ModelMessage): Session 
 }
 
 export function appendRun(session: Session, run: Run): Session {
-  return { ...session, runs: [...session.runs, run] };
+  const runIds = session.runIds ?? session.runs?.map((storedRun) => storedRun.id) ?? [];
+  const nextRunIds = [...runIds, run.id];
+  return { ...session, runIds: nextRunIds, runs: nextRunIds.map((id) => ({ id })) };
 }
 
 export function upsertRun(session: Session, run: Run): Session {
-  const index = session.runs.findIndex((storedRun) => storedRun.id === run.id);
-  if (index < 0) return appendRun(session, run);
-  const runs = [...session.runs];
-  runs[index] = run;
-  return { ...session, runs };
+  const runIds = session.runIds ?? session.runs?.map((storedRun) => storedRun.id) ?? [];
+  const nextRunIds = runIds.includes(run.id) ? runIds : [...runIds, run.id];
+  return { ...session, runIds: nextRunIds, runs: nextRunIds.map((id) => ({ id })) };
+}
+
+export function normalizeSession(session: Session): Session {
+  return {
+    ...session,
+    runIds: session.runIds ?? session.runs?.map((run) => run.id) ?? [],
+    runs: (session.runs ?? session.runIds?.map((id) => ({ id })))?.map((run) => ({ id: run.id })),
+  };
 }

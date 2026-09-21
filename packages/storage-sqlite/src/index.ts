@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { Run, RunStore, Session, SessionStore, StorageBundle, WorkflowRun, WorkflowStore } from "@lunar/foundation";
+import { StorageConflictError, type Run, type RunStore, type Session, type SessionStore, type StorageBundle, type WorkflowRun, type WorkflowStore, type SaveOptions } from "@lunar/foundation";
 
 export const SQLITE_SCHEMA_VERSION = 2;
 
@@ -44,10 +44,16 @@ export class SqliteWorkflowStore implements WorkflowStore {
     initialize(database);
   }
 
-  async save(run: WorkflowRun): Promise<void> {
+  async save(run: WorkflowRun, options: SaveOptions = {}): Promise<WorkflowRun> {
+    const current = await this.get(run.id);
+    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
+      throw new StorageConflictError("workflow-runs", run.id, options.expectedRevision, current?.revision);
+    }
+    const saved = { ...run, revision: (current?.revision ?? -1) + 1 };
     this.database
       .query("INSERT INTO lunar_workflow_runs (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
-      .run(run.id, JSON.stringify(run));
+      .run(saved.id, JSON.stringify(saved));
+    return saved;
   }
 
   async get(id: string): Promise<WorkflowRun | undefined> {
@@ -63,10 +69,16 @@ export class SqliteRunStore implements RunStore {
     initialize(database);
   }
 
-  async save(run: Run): Promise<void> {
+  async save(run: Run, options: SaveOptions = {}): Promise<Run> {
+    const current = await this.get(run.id);
+    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
+      throw new StorageConflictError("runs", run.id, options.expectedRevision, current?.revision);
+    }
+    const saved = { ...run, revision: (current?.revision ?? -1) + 1 };
     this.database
       .query("INSERT INTO lunar_runs (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
-      .run(run.id, JSON.stringify(run));
+      .run(saved.id, JSON.stringify(saved));
+    return saved;
   }
 
   async get(id: string): Promise<Run | undefined> {
@@ -82,10 +94,16 @@ export class SqliteSessionStore implements SessionStore {
     initialize(database);
   }
 
-  async save(session: Session): Promise<void> {
+  async save(session: Session, options: SaveOptions = {}): Promise<Session> {
+    const current = await this.get(session.id);
+    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
+      throw new StorageConflictError("sessions", session.id, options.expectedRevision, current?.revision);
+    }
+    const saved = { ...session, revision: (current?.revision ?? -1) + 1 };
     this.database
       .query("INSERT INTO lunar_sessions (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
-      .run(session.id, JSON.stringify(session));
+      .run(saved.id, JSON.stringify(saved));
+    return saved;
   }
 
   async get(id: string): Promise<Session | undefined> {
@@ -106,11 +124,38 @@ export interface SqliteStores extends StorageBundle {
 
 export function createSqliteStores(database: string | Database = "lunar.db"): SqliteStores {
   const opened = openDatabase(database);
+  const saveRunAndSession = (run: Run, session: Session, options: SaveOptions = {}) => {
+    let savedRun: Run | undefined;
+    let savedSession: Session | undefined;
+    const transaction = (opened as Database & {
+      transaction(callback: () => void): () => void;
+    }).transaction(() => {
+      const runRow = opened.query("SELECT value FROM lunar_runs WHERE id = ?1").get(run.id) as { value: string } | null;
+      const sessionRow = opened.query("SELECT value FROM lunar_sessions WHERE id = ?1").get(session.id) as { value: string } | null;
+      const currentRun = runRow ? JSON.parse(runRow.value) as Run : undefined;
+      const currentSession = sessionRow ? JSON.parse(sessionRow.value) as Session : undefined;
+      if (options.expectedRevision !== undefined && (currentRun?.revision ?? 0) !== options.expectedRevision) {
+        throw new StorageConflictError("runs", run.id, options.expectedRevision, currentRun?.revision);
+      }
+      if (options.expectedSessionRevision !== undefined && (currentSession?.revision ?? 0) !== options.expectedSessionRevision) {
+        throw new StorageConflictError("sessions", session.id, options.expectedSessionRevision, currentSession?.revision);
+      }
+      savedRun = { ...run, revision: (currentRun?.revision ?? -1) + 1 };
+      savedSession = { ...session, revision: (currentSession?.revision ?? -1) + 1 };
+      opened.query("INSERT INTO lunar_runs (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
+        .run(savedRun.id, JSON.stringify(savedRun));
+      opened.query("INSERT INTO lunar_sessions (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
+        .run(savedSession.id, JSON.stringify(savedSession));
+    });
+    transaction();
+    return Promise.resolve({ run: savedRun!, session: savedSession! });
+  };
   return {
     database: opened,
     runStore: new SqliteRunStore(opened),
     sessionStore: new SqliteSessionStore(opened),
     workflowStore: new SqliteWorkflowStore(opened),
+    saveRunAndSession,
     close: () => opened.close(),
   };
 }

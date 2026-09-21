@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fixed plugin workflow registration by sharing the runtime workflow registry.
+- Added revision-aware storage saves and stale-write conflict detection.
+- Normalized sessions to store run references instead of full run records.
+- Added runtime-owned storage bundle shutdown and atomic SQLite run/session saves.
+
 - Added a generic HTTP storage provider for runs, sessions, and workflows.
 - Added Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
 - Added an SDK-neutral MongoDB storage adapter.

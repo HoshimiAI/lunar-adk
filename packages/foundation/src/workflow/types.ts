@@ -17,6 +17,7 @@ export interface WorkflowApproval {
 
 export interface WorkflowRun {
   id: string;
+  revision?: number;
   workflow: string;
   version: string;
   status: WorkflowStatus;

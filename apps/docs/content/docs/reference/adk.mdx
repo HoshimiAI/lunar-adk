@@ -23,6 +23,14 @@ Returns a promise for a `RuntimeHandle`. Configure optional `plugins`,
 Provider factories such as `createSqliteStores()` and `createHttpStores()`
 return compatible bundles for local and remote deployments.
 
+Pass a complete `storage` bundle to compose all three stores at once. Set
+`ownsStorage: true` when the runtime should close that bundle from
+`runtime.shutdown()`; application-managed bundles should leave it unset.
+
+Persisted runs, sessions, and workflow runs carry revisions. Store updates can
+reject stale revisions with `StorageConflictError`, allowing multiple runtime
+instances to detect lost-update races.
+
 The handle exposes `run`, `stream`, `supportsStreaming`, `steer`, `approve`,
 `reject`, `cancel`, `getRun`, `getStoredRun`, `getSession`, `on`,
 `registerAgent`, `registerWorkflow`, `runWorkflow`, `getWorkflowRun`,

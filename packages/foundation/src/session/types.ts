@@ -3,6 +3,9 @@ import type { Run } from "../run";
 
 export interface Session {
   id: string;
+  revision?: number;
   history: ModelMessage[];
-  runs: Run[];
+  runIds?: string[];
+  /** @deprecated Compatibility view containing run references. */
+  runs?: Array<Pick<Run, "id">>;
 }

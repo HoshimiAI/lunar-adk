@@ -41,6 +41,11 @@ Memory and runtime storage are separate ports, so an application can use a
 custom memory database while keeping runs, sessions, and workflows in SQLite,
 HTTP, MongoDB, or another implementation of the corresponding store types.
 
+Sessions keep run IDs and a deprecated compact `runs` compatibility view;
+complete run records remain in the run store. Persisted records use revisions
+for optimistic concurrency, and stale writes are rejected with
+`StorageConflictError`.
+
 `createSqliteStores()` accepts a database path or an existing Bun SQLite
 `Database`. It returns the database handle, `SqliteRunStore`,
 `SqliteSessionStore`, `SqliteWorkflowStore`, and `close()`.

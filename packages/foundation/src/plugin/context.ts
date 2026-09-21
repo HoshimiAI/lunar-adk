@@ -4,8 +4,10 @@ import type { MemoryRegistry } from "../memory";
 import type { EvaluatorRegistry } from "../evaluation";
 import type { EventBus } from "../event";
 import type { CommandRegistry, SchemaRegistry } from "./registries";
+import type { Workflow } from "../workflow";
 
 export interface WorkflowRegistry {
+  register(workflow: Workflow): void;
   register(id: string, run: () => Promise<unknown>): void;
 }
 

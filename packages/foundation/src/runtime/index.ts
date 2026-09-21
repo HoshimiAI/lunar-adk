@@ -4,7 +4,7 @@ import type { AgentRunResult } from "../agent";
 import { AgentRunError } from "../agent";
 import { appendEvent, cancelRun, createRun, failRun, type Run } from "../run";
 import { InMemoryRunStore } from "../run";
-import { upsertRun, appendMessage, appendRun, createSession, InMemorySessionStore } from "../session";
+import { upsertRun, appendMessage, createSession, InMemorySessionStore, normalizeSession } from "../session";
 import type { Session } from "../session";
 import type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "./types";
 import { InMemoryWorkflowStore } from "../workflow";
@@ -63,15 +63,16 @@ interface ActiveRun {
 
 export async function createRuntime(config: RuntimeConfig = {}): Promise<RuntimeHandle> {
   const resolved = resolveConfig(config);
-  const { agents, events } = await bootstrap(resolved, config.memory);
+  const { agents, events, workflows } = await bootstrap(resolved, config.memory);
   const runs = new Map<string, Run>();
   const activeRuns = new Map<string, ActiveRun>();
-  const runStore = config.runStore ?? new InMemoryRunStore();
-  const sessionStore = config.sessionStore ?? new InMemorySessionStore();
-  const workflowStore = config.workflowStore ?? new InMemoryWorkflowStore();
+  const storage = config.storage;
+  const useStorageBundle = Boolean(storage && !config.runStore && !config.sessionStore && !config.workflowStore);
+  const runStore = config.runStore ?? storage?.runStore ?? new InMemoryRunStore();
+  const sessionStore = config.sessionStore ?? storage?.sessionStore ?? new InMemorySessionStore();
+  const workflowStore = config.workflowStore ?? storage?.workflowStore ?? new InMemoryWorkflowStore();
   const observability = new ObservabilityHub(config.observability);
   events.onAny((event) => observability.recordEvent(event));
-  const workflows = new Map<string, Workflow>();
   const activeWorkflows = new Map<string, { controller: AbortController; promise: Promise<WorkflowRun> }>();
   const sessionLocks = new Map<string, Promise<void>>();
 
@@ -91,15 +92,24 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     }
   }
 
-  async function saveRunForSession(session: Session, run: Run, appendAssistant?: string): Promise<void> {
-    runs.set(run.id, run);
-    await runStore.save(run);
-    observability.recordRun(run);
-    let nextSession = upsertRun(session, run);
+  async function saveRunForSession(session: Session, run: Run<string>, appendAssistant?: string): Promise<Run<string>> {
+    let nextSession = upsertRun(normalizeSession(session), run);
     if (appendAssistant !== undefined) {
       nextSession = appendMessage(nextSession, { role: "assistant", content: appendAssistant });
     }
-    await sessionStore.save(nextSession);
+    const saved = useStorageBundle && storage?.saveRunAndSession
+      ? await storage.saveRunAndSession(run, nextSession, {
+          expectedRevision: run.revision,
+          expectedSessionRevision: session.revision,
+        })
+      : {
+          run: await runStore.save(run, { expectedRevision: run.revision }),
+          session: await sessionStore.save(nextSession, { expectedRevision: session.revision }),
+        };
+    const savedRun = saved.run as Run<string>;
+    runs.set(savedRun.id, savedRun);
+    observability.recordRun(savedRun);
+    return savedRun;
   }
 
   function controlEvent<Result>(run: Run<Result>, name: "run.cancelled" | "run.failed", payload: unknown): Run<Result> {
@@ -157,13 +167,14 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
 
     try {
       const result = await promise;
-      await saveRunForSession(sessionForRun, result.run, result.output);
-      return result;
+      const savedRun = await saveRunForSession(sessionForRun, result.run, result.output);
+      return { ...result, run: savedRun };
     } catch (error) {
       if (error instanceof AgentRunError) {
-        const run = error.run;
-        await saveRunForSession(sessionForRun, run);
-        if (error.code === "APPROVAL_REQUIRED") return { output: "", run };
+        const run = error.run as Run<string>;
+        const savedRun = await saveRunForSession(sessionForRun, run);
+        if (error.code === "APPROVAL_REQUIRED") return { output: "", run: savedRun };
+        throw new AgentRunError(error.message, savedRun, error.code, { cause: error });
       }
       throw error;
     } finally {
@@ -173,8 +184,9 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   }
 
   async function saveWorkflow(run: WorkflowRun): Promise<WorkflowRun> {
-    await workflowStore.save(run);
-    return run;
+    const saved = await workflowStore.save(run, { expectedRevision: run.revision });
+    Object.assign(run, saved);
+    return saved;
   }
 
   async function executeWorkflow(workflow: Workflow, input: unknown, existing?: WorkflowRun, approvedApprovalId?: string): Promise<WorkflowRun> {
@@ -234,7 +246,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
         if (!agent) throw new Error(`Unknown agent: ${String(agentRef)}`);
         const sessionId = options.sessionId;
         const session = sessionId
-          ? (await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId }
+          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId })
           : createSession();
         const result = await executeAgent(agent.name, agentInput, session, {
           signal: controller.signal,
@@ -279,7 +291,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       const sessionId = options?.sessionId ?? createSession().id;
       return withSessionLock(sessionId, async () => {
         const session = options?.sessionId
-          ? (await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId }
+          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId })
           : { ...createSession(), id: sessionId };
         return executeAgent(agentName, input, session, options);
       });
@@ -359,10 +371,10 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           active.controller.abort("steered");
           await active.promise.catch(() => undefined);
           await withSessionLock(sessionId, async () => {
-            const session = (await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId };
+            const session = normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId });
             const interrupted = await runStore.get(interruptedRunId);
             const steered = appendMessage(session, { role: "system", content });
-            await sessionStore.save(steered);
+            await sessionStore.save(steered, { expectedRevision: session.revision });
             const captured = active.continuation ?? {
               input: active.input,
               messages: session.history,
@@ -387,9 +399,9 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       }
 
       return withSessionLock(sessionId, async () => {
-        const session = (await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId };
+        const session = normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId });
         const steered = appendMessage(session, { role: "system", content });
-        await sessionStore.save(steered);
+        await sessionStore.save(steered, { expectedRevision: session.revision });
         return steered;
       });
     },
@@ -434,8 +446,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           "run.failed",
           { runId, error: "Tool approval was rejected" },
         );
-        await saveRunForSession(session, run);
-        return run;
+        return await saveRunForSession(session, run as Run<string>);
       });
     },
 
@@ -456,16 +467,21 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
         const session = await sessionStore.get(storedRun.sessionId!);
         if (!session) return storedRun;
         const run = controlEvent(cancelRun(storedRun), "run.cancelled", { runId });
-        await saveRunForSession(session, run);
-        return run;
+        return await saveRunForSession(session, run as Run<string>);
       });
     },
 
     getRun: (runId) => runs.get(runId),
     getStoredRun: (runId) => runStore.get(runId),
-    getSession: (sessionId) => sessionStore.get(sessionId),
+    getSession: async (sessionId) => {
+      const session = await sessionStore.get(sessionId);
+      return session ? normalizeSession(session) : undefined;
+    },
     on: (event, handler) => events.on(event, handler),
-    shutdown: () => observability.shutdown(),
+    async shutdown() {
+      await observability.shutdown();
+      if (config.ownsStorage) await storage?.close?.();
+    },
     registerAgent: (agent) => agents.register(agent),
     registerWorkflow: (workflow) => workflows.set(workflow.name, workflow),
     runWorkflow(name, input) {

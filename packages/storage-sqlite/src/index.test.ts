@@ -17,7 +17,7 @@ test("persists runs and sessions in SQLite", async () => {
       return { text: "persisted", toolCalls: [] };
     },
   };
-  const runtime = await createRuntime({ runStore: stores.runStore, sessionStore: stores.sessionStore });
+  const runtime = await createRuntime({ storage: stores, ownsStorage: true });
   runtime.registerAgent(defineAgent({ name: "assistant", model }));
 
   const result = await runtime.run("assistant", "hello");
@@ -27,7 +27,8 @@ test("persists runs and sessions in SQLite", async () => {
   expect(restoredRun?.result).toBe("persisted");
   expect(restoredSession?.history.map((message) => message.content)).toEqual(["hello", "persisted"]);
   expect(restoredSession?.runs[0]?.id).toBe(result.run.id);
-  stores.close();
+  expect(restoredSession?.runIds).toEqual([result.run.id]);
+  await runtime.shutdown?.();
 });
 
 test("reopens a file-backed database without losing data", async () => {

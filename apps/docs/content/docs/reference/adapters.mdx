@@ -83,6 +83,10 @@ Accepts an application-provided Mongo database object and maps runs, sessions,
 and workflow runs to collections using `replaceOne(..., { upsert: true })`.
 The package intentionally does not own a MongoDB SDK dependency.
 
+All storage adapters implement revision-aware saves. HTTP adapters send the
+expected revision as `If-Match`; a compatible remote service should reject a
+stale write with `409 Conflict`.
+
 ## `@lunar/observability-otel`
 
 The optional observability package exports `createConsoleExporter()` and

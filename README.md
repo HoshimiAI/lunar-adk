@@ -111,7 +111,7 @@ finish once, interrupts before the next model turn, and returns `202` with the
 interrupted and continuation run IDs. Active streaming responses emit a
 `stream.interrupted` event before closing; the continuation is a separate run.
 
-Plugins, memory search, and authentication remain deferred for later releases.
+Memory search and authentication remain deferred for later releases.
 
 Approval-required tools pause a run with `status: "waiting_approval"`. Approve or reject the pending request with `POST /runs/<run-id>/approve` or `POST /runs/<run-id>/reject`, passing the returned `approvalId`. Active runs can be cancelled with `POST /runs/<run-id>/cancel`.
 

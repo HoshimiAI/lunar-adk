@@ -34,7 +34,8 @@ export type { Session, SessionStore } from "@lunar/foundation/session";
 
 export type { LunarEvent, EventName } from "@lunar/foundation/event";
 export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "@lunar/foundation/observability";
-export type { StorageBundle } from "@lunar/foundation/storage";
+export { StorageConflictError } from "@lunar/foundation/storage";
+export type { StorageBundle, SaveOptions } from "@lunar/foundation/storage";
 
 export { createMemory, createInMemoryProvider, MemoryRegistry } from "@lunar/foundation/memory";
 export type { MemoryProvider, MemoryRecord, MemoryQuery } from "@lunar/foundation/memory";

@@ -8,6 +8,7 @@ import type { RunStore } from "../run";
 import type { Workflow, WorkflowRun, WorkflowStore } from "../workflow";
 import type { ObservabilityConfig } from "../observability";
 import type { MemoryProvider } from "../memory";
+import type { StorageBundle } from "../storage";
 
 export interface SteeringResult {
   status: "accepted";
@@ -22,6 +23,8 @@ export interface RuntimeConfig {
   runStore?: RunStore;
   sessionStore?: SessionStore;
   workflowStore?: WorkflowStore;
+  storage?: StorageBundle;
+  ownsStorage?: boolean;
   observability?: ObservabilityConfig;
 }
 

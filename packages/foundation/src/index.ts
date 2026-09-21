@@ -45,4 +45,5 @@ export { createSession, InMemorySessionStore } from "./session";
 export type { Session, SessionStore } from "./session";
 export type { LunarEvent, EventName } from "./event";
 export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "./observability";
-export type { StorageBundle } from "./storage";
+export { StorageConflictError } from "./storage";
+export type { StorageBundle, SaveOptions } from "./storage";

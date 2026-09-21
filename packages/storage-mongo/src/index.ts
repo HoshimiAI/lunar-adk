@@ -1,4 +1,4 @@
-import type { Run, RunStore, Session, SessionStore, StorageBundle, WorkflowRun, WorkflowStore } from "@lunar/foundation";
+import { StorageConflictError, type Run, type RunStore, type Session, type SessionStore, type StorageBundle, type WorkflowRun, type WorkflowStore, type SaveOptions } from "@lunar/foundation";
 
 export interface MongoCollection<T> {
   replaceOne(filter: { id: string }, replacement: T, options: { upsert: true }): Promise<unknown>;
@@ -15,11 +15,17 @@ export interface MongoStorageOptions {
   close?(): void | Promise<void>;
 }
 
-class MongoStore<T extends { id: string }> {
+class MongoStore<T extends { id: string; revision?: number }> {
   constructor(private readonly collection: MongoCollection<T>) {}
 
-  async save(value: T): Promise<void> {
-    await this.collection.replaceOne({ id: value.id }, value, { upsert: true });
+  async save(value: T, options: SaveOptions = {}): Promise<T> {
+    const current = await this.get(value.id);
+    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
+      throw new StorageConflictError("mongo", value.id, options.expectedRevision, current?.revision);
+    }
+    const saved = { ...value, revision: (current?.revision ?? -1) + 1 } as T;
+    await this.collection.replaceOne({ id: value.id }, saved, { upsert: true });
+    return saved;
   }
 
   async get(id: string): Promise<T | undefined> {

@@ -12,6 +12,7 @@ export interface RunUsage {
 
 export interface Run<Result = unknown> {
   id: string;
+  revision?: number;
   agent?: string;
   model?: string;
   sessionId?: string;

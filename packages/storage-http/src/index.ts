@@ -1,4 +1,4 @@
-import type { Run, RunStore, Session, SessionStore, StorageBundle, WorkflowRun, WorkflowStore } from "@lunar/foundation";
+import { StorageConflictError, type Run, type RunStore, type Session, type SessionStore, type StorageBundle, type WorkflowRun, type WorkflowStore, type SaveOptions } from "@lunar/foundation";
 
 export interface HttpStorageOptions {
   baseUrl: string;
@@ -22,7 +22,7 @@ export class HttpStorageError extends Error {
   }
 }
 
-type StoredRecord = { id: string };
+type StoredRecord = { id: string; revision?: number };
 
 function normalizeBaseUrl(baseUrl: string): string {
   const normalized = baseUrl.trim().replace(/\/+$/, "");
@@ -60,8 +60,16 @@ class HttpStore<T extends StoredRecord> {
     this.retryDelayMs = Math.max(0, options.retryDelayMs ?? 100);
   }
 
-  async save(value: T): Promise<void> {
-    await this.request(value.id, "PUT", value);
+  async save(value: T, options: SaveOptions = {}): Promise<T> {
+    const current = options.expectedRevision === undefined && value.revision === undefined
+      ? undefined
+      : await this.get(value.id);
+    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
+      throw new StorageConflictError(this.resource, value.id, options.expectedRevision, current?.revision);
+    }
+    const saved = { ...value, revision: (current?.revision ?? -1) + 1 } as T & { revision: number };
+    await this.request(saved.id, "PUT", saved, saved.revision === 0 ? undefined : saved.revision - 1);
+    return saved as T;
   }
 
   async get(id: string): Promise<T | undefined> {
@@ -74,8 +82,8 @@ class HttpStore<T extends StoredRecord> {
     await Promise.allSettled(this.pending);
   }
 
-  private async request(id: string, method: "GET" | "PUT", value?: T): Promise<unknown> {
-    const operation = this.requestWithRetry(id, method, value);
+  private async request(id: string, method: "GET" | "PUT", value?: T, expectedRevision?: number): Promise<unknown> {
+    const operation = this.requestWithRetry(id, method, value, expectedRevision);
     this.pending.add(operation);
     try {
       return await operation;
@@ -84,7 +92,7 @@ class HttpStore<T extends StoredRecord> {
     }
   }
 
-  private async requestWithRetry(id: string, method: "GET" | "PUT", value?: T): Promise<unknown> {
+  private async requestWithRetry(id: string, method: "GET" | "PUT", value?: T, expectedRevision?: number): Promise<unknown> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       try {
@@ -97,6 +105,7 @@ class HttpStore<T extends StoredRecord> {
             headers: {
               ...this.headers,
               ...(value === undefined ? {} : { "content-type": "application/json" }),
+              ...(expectedRevision === undefined ? {} : { "if-match": String(expectedRevision) }),
             },
             body: value === undefined ? undefined : JSON.stringify(value),
             signal: controller.signal,
@@ -106,6 +115,9 @@ class HttpStore<T extends StoredRecord> {
         }
 
         if (response.status === 404 && method === "GET") return undefined;
+        if (response.status === 409) {
+          throw new StorageConflictError(this.resource, id, expectedRevision, undefined);
+        }
         if (response.ok) {
           if (method === "GET") return await response.json();
           return undefined;
@@ -122,6 +134,7 @@ class HttpStore<T extends StoredRecord> {
         }
         lastError = new HttpStorageError(`HTTP storage request returned ${response.status}`, this.resource, id, response.status);
       } catch (error) {
+        if (error instanceof StorageConflictError) throw error;
         if (error instanceof HttpStorageError && !isRetryable(error.status)) throw error;
         lastError = error;
         if (attempt === this.maxAttempts) {
