@@ -6,6 +6,7 @@ import type { LunarEvent } from "../event";
 import type { Plugin } from "../plugin";
 import type { RunStore } from "../run";
 import type { Workflow, WorkflowRun, WorkflowStore } from "../workflow";
+import type { ObservabilityConfig } from "../observability";
 
 export interface SteeringResult {
   status: "accepted";
@@ -19,6 +20,7 @@ export interface RuntimeConfig {
   runStore?: RunStore;
   sessionStore?: SessionStore;
   workflowStore?: WorkflowStore;
+  observability?: ObservabilityConfig;
 }
 
 export interface RuntimeHandle {
@@ -39,6 +41,7 @@ export interface RuntimeHandle {
   getWorkflowRun(id: string): Promise<WorkflowRun | undefined>;
   resumeWorkflow(id: string, approvalId?: string): Promise<WorkflowRun>;
   cancelWorkflow(id: string): Promise<WorkflowRun | undefined>;
+  shutdown?(): Promise<void>;
 }
 
 export type RuntimeStreamEvent =

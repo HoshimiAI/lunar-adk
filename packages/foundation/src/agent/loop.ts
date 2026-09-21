@@ -17,6 +17,7 @@ import { withRetry } from "./retry";
 import { AgentRunError } from "./errors";
 import { throwIfAborted } from "./cancellation";
 import type { AgentConfig, AgentRunOptions, AgentRunResult } from "./types";
+import { endSpan, startSpan } from "../run/trace";
 
 export async function runAgentLoop(
   config: AgentConfig,
@@ -56,6 +57,8 @@ export async function runAgentLoop(
   let nextToolIndex = continuation?.nextToolIndex ?? 0;
   let approvedToolCallId = options.approvedToolCallId;
   let interruptionCaptured = false;
+  const agentSpan = startSpan(`agent.${config.name}`, "agent", run.id, undefined, { "lunar.agent": config.name });
+  run = { ...run, trace: [...run.trace, agentSpan] };
   const captureInterruption = () => {
     if (interruptionCaptured || options.signal?.reason !== "steered") return;
     interruptionCaptured = true;
@@ -99,6 +102,8 @@ export async function runAgentLoop(
             signal: options.signal,
           };
         let response: ModelResponse;
+        const modelSpan = startSpan(`model.${config.model.id}`, "model", run.id, agentSpan.id, { "lunar.model": config.model.id });
+        try {
         if (options.streaming) {
           if (config.model.capabilities.streaming !== true || !config.model.stream) {
             throw new Error(`Model "${config.model.id}" does not support streaming`);
@@ -120,12 +125,18 @@ export async function runAgentLoop(
             options.signal,
           );
         }
+        run = { ...run, trace: [...run.trace, endSpan(modelSpan, "ok")] };
+        } catch (error) {
+          run = { ...run, trace: [...run.trace, endSpan(modelSpan, "error", error instanceof Error ? error.message : String(error))] };
+          throw error;
+        }
 
         run = addUsage(run, response.usage ?? { inputTokens: 0, outputTokens: 0 });
         record("model.called", { agent: config.name, runId: run.id, round });
 
         if (response.toolCalls.length === 0) {
           run = completeRun(run, response.text);
+          run = { ...run, trace: [...run.trace, endSpan(agentSpan, "ok")] };
           record("agent.completed", { agent: config.name, runId: run.id });
           record("run.completed", { agent: config.name, runId: run.id });
           return { output: response.text, run };
@@ -140,6 +151,11 @@ export async function runAgentLoop(
       if (!toolCall) continue;
       throwIfAborted(options.signal);
       const tool = tools.get(toolCall.name);
+      const toolSpan = startSpan(`tool.${toolCall.name}`, "tool", run.id, agentSpan.id, {
+        "lunar.tool": toolCall.name,
+        "lunar.tool_call_id": toolCall.id,
+      });
+      run = { ...run, trace: [...run.trace, toolSpan] };
       record("tool.started", { tool: toolCall.name, runId: run.id, toolCallId: toolCall.id });
 
       if (tool && needsApproval(tool) && approvedToolCallId !== toolCall.id) {
@@ -158,6 +174,7 @@ export async function runAgentLoop(
           nextToolIndex,
         });
         record("tool.approval_required", { tool: tool.name, runId: run.id, approvalId: approval.id });
+        run = { ...run, trace: run.trace.map((span) => span.id === toolSpan.id ? endSpan(span, "unset") : span) };
         throw new AgentRunError(
           `Tool "${tool.name}" requires approval before execution`,
           run,
@@ -174,6 +191,7 @@ export async function runAgentLoop(
         toolCallId: toolCall.id,
         result,
       });
+      run = { ...run, trace: run.trace.map((span) => span.id === toolSpan.id ? endSpan(span, result.error ? "error" : "ok", result.error) : span) };
       messages.push({
         role: "tool",
         toolCallId: toolCall.id,
@@ -197,6 +215,7 @@ export async function runAgentLoop(
         : "EXECUTION_FAILED";
     captureInterruption();
     run = cancelled ? cancelRun(run, message) : failRun(run, message, code);
+    run = { ...run, trace: run.trace.map((span) => span.id === agentSpan.id ? endSpan(span, cancelled ? "unset" : "error", message) : span) };
     if (code === "STEERED") run = { ...run, errorCode: code };
     record(cancelled ? "run.cancelled" : "agent.failed", { agent: config.name, runId: run.id, error: message });
     if (!cancelled) record("run.failed", { agent: config.name, runId: run.id, error: message });

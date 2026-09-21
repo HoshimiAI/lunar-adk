@@ -33,6 +33,7 @@ export { createSession, InMemorySessionStore } from "@lunar/foundation/session";
 export type { Session, SessionStore } from "@lunar/foundation/session";
 
 export type { LunarEvent, EventName } from "@lunar/foundation/event";
+export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "@lunar/foundation/observability";
 
 export { defineWorkflow, InMemoryWorkflowStore, WorkflowApprovalRequired } from "@lunar/foundation/workflow";
 export type {

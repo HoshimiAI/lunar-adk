@@ -13,6 +13,7 @@
     "@lunar/adk": "workspace:*",
     "@lunar/provider-openai": "workspace:*",
     "@lunar/storage-sqlite": "workspace:*",
+    "@lunar/observability-otel": "workspace:*",
     "elysia": "latest"
   }
 }

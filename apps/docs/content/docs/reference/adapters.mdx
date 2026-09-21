@@ -45,3 +45,11 @@ Accepts a SQLite path or Bun `Database`, defaulting to `lunar.db`. Returns:
 
 The package also exports `SqliteRunStore`, `SqliteSessionStore`,
 `SqliteWorkflowStore`, and `SQLITE_SCHEMA_VERSION`.
+
+## `@lunar/observability-otel`
+
+The optional observability package exports `createConsoleExporter()` and
+`createOTLPExporter({ endpoint, headers, serviceName })`. Pass exporters through
+`createRuntime({ observability: { exporters } })`. Telemetry captures metadata
+only by default; set `captureContent: true` explicitly to include prompts,
+outputs, and tool inputs.

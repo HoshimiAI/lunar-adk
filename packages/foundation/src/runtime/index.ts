@@ -11,6 +11,7 @@ import { InMemoryWorkflowStore } from "../workflow";
 import type { Workflow, WorkflowContext, WorkflowRun } from "../workflow";
 import type { RunContinuation } from "../run";
 import { WorkflowApprovalRequired } from "../workflow";
+import { ObservabilityHub } from "../observability";
 
 export type { RuntimeConfig, RuntimeHandle, SteeringResult } from "./types";
 export type { RuntimeStreamEvent } from "./types";
@@ -68,6 +69,8 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   const runStore = config.runStore ?? new InMemoryRunStore();
   const sessionStore = config.sessionStore ?? new InMemorySessionStore();
   const workflowStore = config.workflowStore ?? new InMemoryWorkflowStore();
+  const observability = new ObservabilityHub(config.observability);
+  events.onAny((event) => observability.recordEvent(event));
   const workflows = new Map<string, Workflow>();
   const activeWorkflows = new Map<string, { controller: AbortController; promise: Promise<WorkflowRun> }>();
   const sessionLocks = new Map<string, Promise<void>>();
@@ -91,6 +94,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   async function saveRunForSession(session: Session, run: Run, appendAssistant?: string): Promise<void> {
     runs.set(run.id, run);
     await runStore.save(run);
+    observability.recordRun(run);
     let nextSession = upsertRun(session, run);
     if (appendAssistant !== undefined) {
       nextSession = appendMessage(nextSession, { role: "assistant", content: appendAssistant });
@@ -461,6 +465,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     getStoredRun: (runId) => runStore.get(runId),
     getSession: (sessionId) => sessionStore.get(sessionId),
     on: (event, handler) => events.on(event, handler),
+    shutdown: () => observability.shutdown(),
     registerAgent: (agent) => agents.register(agent),
     registerWorkflow: (workflow) => workflows.set(workflow.name, workflow),
     runWorkflow(name, input) {

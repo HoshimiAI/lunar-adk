@@ -3,6 +3,7 @@ import type { EventHandler, LunarEvent } from "./types";
 
 export class EventBus {
   private handlers = new Map<EventName, Set<EventHandler>>();
+  private anyHandlers = new Set<EventHandler>();
 
   on<Payload = unknown>(name: EventName, handler: EventHandler<Payload>): () => void {
     const set = this.handlers.get(name) ?? new Set();
@@ -11,8 +12,14 @@ export class EventBus {
     return () => set.delete(handler as EventHandler);
   }
 
+  onAny(handler: EventHandler): () => void {
+    this.anyHandlers.add(handler);
+    return () => this.anyHandlers.delete(handler);
+  }
+
   emit<Payload = unknown>(name: EventName, payload: Payload): void {
     const event: LunarEvent<Payload> = { name, payload, timestamp: Date.now() };
+    for (const handler of this.anyHandlers) void handler(event);
     for (const handler of this.handlers.get(name) ?? []) {
       void handler(event);
     }

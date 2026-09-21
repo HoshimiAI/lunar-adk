@@ -6,6 +6,7 @@
     { "path": "packages/provider-ai-sdk" },
     { "path": "packages/provider-openai" },
     { "path": "packages/storage-sqlite" },
+    { "path": "packages/observability-otel" },
     { "path": "apps/elysia" }
   ]
 }

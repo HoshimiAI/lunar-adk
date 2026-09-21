@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added optional observability exporters for console output and OTLP traces.
+- Added agent, model, and tool trace spans with token and status metadata.
+- Added default telemetry redaction and Elysia environment configuration.
+
 ## 1.2.0
 
 - Added flexible code-first workflow definitions with explicit checkpoints and approval pauses.

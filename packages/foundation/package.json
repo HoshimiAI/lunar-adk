@@ -15,6 +15,7 @@
     "./plugin": "./src/plugin/index.ts",
     "./session": "./src/session/index.ts",
     "./evaluation": "./src/evaluation/index.ts",
+    "./observability": "./src/observability/index.ts",
     "./runtime": "./src/runtime/index.ts",
     "./types": "./src/types/index.ts",
     "./package.json": "./package.json"

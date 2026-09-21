@@ -44,3 +44,4 @@ export type { RunStore } from "./run";
 export { createSession, InMemorySessionStore } from "./session";
 export type { Session, SessionStore } from "./session";
 export type { LunarEvent, EventName } from "./event";
+export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "./observability";

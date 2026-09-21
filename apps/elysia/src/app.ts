@@ -3,6 +3,7 @@ import { AgentRunError, createRuntime, defineAgent } from "@lunar/adk";
 import type { RuntimeHandle, RuntimeStreamEvent } from "@lunar/adk";
 import { createOpenAIModelProvider } from "@lunar/provider-openai";
 import { createSqliteStores } from "@lunar/storage-sqlite";
+import { createConsoleExporter, createOTLPExporter } from "@lunar/observability-otel";
 import { elysiaTools } from "./tools";
 
 function encodeSse(event: string, data: unknown): Uint8Array {
@@ -225,10 +226,21 @@ export async function createDefaultApp() {
   }
 
   const storage = createSqliteStores(process.env.SQLITE_PATH ?? "lunar.db");
+  const exporters = [];
+  if (process.env.LUNAR_TELEMETRY === "console") exporters.push(createConsoleExporter());
+  const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  if (otlpEndpoint) exporters.push(createOTLPExporter({
+    endpoint: otlpEndpoint.endsWith("/v1/traces") ? otlpEndpoint : `${otlpEndpoint.replace(/\/$/, "")}/v1/traces`,
+    serviceName: process.env.OTEL_SERVICE_NAME ?? "lunar-elysia",
+  }));
   const runtime = await createRuntime({
     runStore: storage.runStore,
     sessionStore: storage.sessionStore,
     workflowStore: storage.workflowStore,
+    observability: {
+      exporters,
+      captureContent: process.env.LUNAR_TELEMETRY_CAPTURE_CONTENT === "true",
+    },
   });
   runtime.registerAgent(
     defineAgent({
@@ -242,5 +254,8 @@ export async function createDefaultApp() {
     }),
   );
 
-  return (await createApp(runtime)).onStop(() => storage.close());
+  return (await createApp(runtime)).onStop(async () => {
+    await runtime.shutdown?.();
+    storage.close();
+  });
 }
