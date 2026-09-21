@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { Run, RunStore, Session, SessionStore, WorkflowRun, WorkflowStore } from "@lunar/foundation";
+import type { Run, RunStore, Session, SessionStore, StorageBundle, WorkflowRun, WorkflowStore } from "@lunar/foundation";
 
 export const SQLITE_SCHEMA_VERSION = 2;
 
@@ -96,7 +96,7 @@ export class SqliteSessionStore implements SessionStore {
   }
 }
 
-export interface SqliteStores {
+export interface SqliteStores extends StorageBundle {
   database: Database;
   runStore: SqliteRunStore;
   sessionStore: SqliteSessionStore;

@@ -7,6 +7,7 @@ import type { Plugin } from "../plugin";
 import type { RunStore } from "../run";
 import type { Workflow, WorkflowRun, WorkflowStore } from "../workflow";
 import type { ObservabilityConfig } from "../observability";
+import type { MemoryProvider } from "../memory";
 
 export interface SteeringResult {
   status: "accepted";
@@ -17,6 +18,7 @@ export interface SteeringResult {
 
 export interface RuntimeConfig {
   plugins?: Plugin[];
+  memory?: MemoryProvider;
   runStore?: RunStore;
   sessionStore?: SessionStore;
   workflowStore?: WorkflowStore;

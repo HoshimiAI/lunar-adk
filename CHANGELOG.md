@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added a generic HTTP storage provider for runs, sessions, and workflows.
+- Added Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
+- Added an SDK-neutral MongoDB storage adapter.
+- Added local/remote storage selection to the Elysia example.
+- Documented the storage contract for future Unknown Planet compatibility.
+
 - Added optional observability exporters for console output and OTLP traces.
 - Added agent, model, and tool trace spans with token and status metadata.
 - Added default telemetry redaction and Elysia environment configuration.

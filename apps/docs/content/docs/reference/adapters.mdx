@@ -46,6 +46,43 @@ Accepts a SQLite path or Bun `Database`, defaulting to `lunar.db`. Returns:
 The package also exports `SqliteRunStore`, `SqliteSessionStore`,
 `SqliteWorkflowStore`, and `SQLITE_SCHEMA_VERSION`.
 
+## `createSqliteMemoryProvider(database?)`
+
+Package: `@lunar/memory-sqlite`
+
+Creates a durable `MemoryProvider` backed by a Bun SQLite database. It
+persists memory records and implements the foundation provider's substring
+retrieval and limit behavior. Pass the provider as `memory` to
+`createRuntime()`.
+
+## `createHttpStores(options)`
+
+Package: `@lunar/storage-http`
+
+Creates remote run, session, and workflow stores backed by a JSON HTTP service.
+The provider uses `PUT /v1/{resource}/:id` for idempotent saves and
+`GET /v1/{resource}/:id` for reads. Missing records return `undefined`.
+
+Options include `baseUrl`, an optional bearer `token`, custom `headers`,
+`timeoutMs`, `maxAttempts`, and `retryDelayMs`. Reads and idempotent writes
+retry transient network, timeout, rate-limit, and server failures.
+
+## `createBunSqlStores(options)`
+
+Package: `@lunar/storage-bun-sql`
+
+Creates the same storage bundle using Bun.SQL. Supported dialects are
+`sqlite`, `postgres`, and `mysql`; MariaDB uses the MySQL dialect. The
+`connection` can be a Bun SQL connection URL or an existing `SQL` client.
+
+## `createMongoStores(options)`
+
+Package: `@lunar/storage-mongo`
+
+Accepts an application-provided Mongo database object and maps runs, sessions,
+and workflow runs to collections using `replaceOne(..., { upsert: true })`.
+The package intentionally does not own a MongoDB SDK dependency.
+
 ## `@lunar/observability-otel`
 
 The optional observability package exports `createConsoleExporter()` and

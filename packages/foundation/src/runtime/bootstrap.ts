@@ -1,6 +1,6 @@
 import { AgentRegistry } from "../agent";
 import { ToolRegistry } from "../tool";
-import { MemoryRegistry } from "../memory";
+import { MemoryRegistry, createInMemoryProvider } from "../memory";
 import { EvaluatorRegistry } from "../evaluation";
 import { EventBus } from "../event";
 import { CommandRegistry, SchemaRegistry, installPlugin, resolveOrder, type PluginContext } from "../plugin";
@@ -14,10 +14,14 @@ export interface Bootstrapped {
   events: EventBus;
 }
 
-export async function bootstrap(config: Required<Pick<RuntimeConfig, "plugins">>): Promise<Bootstrapped> {
+export async function bootstrap(
+  config: Required<Pick<RuntimeConfig, "plugins">>,
+  memoryProvider?: RuntimeConfig["memory"],
+): Promise<Bootstrapped> {
   const agents = new AgentRegistry();
   const tools = new ToolRegistry();
   const memory = new MemoryRegistry();
+  memory.register(memoryProvider ?? createInMemoryProvider());
   const evaluators = new EvaluatorRegistry();
   const events = new EventBus();
 

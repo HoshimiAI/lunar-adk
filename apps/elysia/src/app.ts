@@ -3,6 +3,8 @@ import { AgentRunError, createRuntime, defineAgent } from "@lunar/adk";
 import type { RuntimeHandle, RuntimeStreamEvent } from "@lunar/adk";
 import { createOpenAIModelProvider } from "@lunar/provider-openai";
 import { createSqliteStores } from "@lunar/storage-sqlite";
+import { createHttpStores } from "@lunar/storage-http";
+import { createBunSqlStores, type BunSqlDialect } from "@lunar/storage-bun-sql";
 import { createConsoleExporter, createOTLPExporter } from "@lunar/observability-otel";
 import { elysiaTools } from "./tools";
 
@@ -225,7 +227,21 @@ export async function createDefaultApp() {
     throw new Error("OPENAI_API_KEY is required to start the Elysia app");
   }
 
-  const storage = createSqliteStores(process.env.SQLITE_PATH ?? "lunar.db");
+  const storageProvider = process.env.STORAGE_PROVIDER ?? "sqlite";
+  if (!["sqlite", "postgres", "mysql", "http"].includes(storageProvider)) {
+    throw new Error(`Unsupported STORAGE_PROVIDER: ${storageProvider}`);
+  }
+  const storage = storageProvider === "http"
+    ? createHttpStores({
+        baseUrl: process.env.STORAGE_HTTP_BASE_URL ?? (() => { throw new Error("STORAGE_HTTP_BASE_URL is required when STORAGE_PROVIDER=http"); })(),
+        token: process.env.STORAGE_HTTP_TOKEN,
+      })
+    : storageProvider === "sqlite"
+      ? createSqliteStores(process.env.SQLITE_PATH ?? "lunar.db")
+      : await createBunSqlStores({
+          connection: process.env.DATABASE_URL ?? (() => { throw new Error("DATABASE_URL is required for SQL remote storage"); })(),
+          dialect: storageProvider as BunSqlDialect,
+        });
   const exporters = [];
   if (process.env.LUNAR_TELEMETRY === "console") exporters.push(createConsoleExporter());
   const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
@@ -256,6 +272,6 @@ export async function createDefaultApp() {
 
   return (await createApp(runtime)).onStop(async () => {
     await runtime.shutdown?.();
-    storage.close();
+    await storage.close?.();
   });
 }

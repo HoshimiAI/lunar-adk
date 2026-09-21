@@ -20,9 +20,54 @@ const runtime = await createRuntime({
 // Call storage.close() during application shutdown.
 ```
 
+Memory is independently configurable. Pass any implementation of
+`MemoryProvider` to `createRuntime()`; it is registered for plugins under its
+provider ID. The default is the in-memory provider.
+
+For durable SQLite memory, use `@lunar/memory-sqlite`:
+
+```ts
+import { createRuntime } from '@lunar/adk';
+import { createSqliteMemoryProvider } from '@lunar/memory-sqlite';
+
+const memory = createSqliteMemoryProvider('lunar-memory.db');
+const runtime = await createRuntime({ memory });
+
+// Close application-owned providers during shutdown.
+memory.close();
+```
+
+Memory and runtime storage are separate ports, so an application can use a
+custom memory database while keeping runs, sessions, and workflows in SQLite,
+HTTP, MongoDB, or another implementation of the corresponding store types.
+
 `createSqliteStores()` accepts a database path or an existing Bun SQLite
 `Database`. It returns the database handle, `SqliteRunStore`,
 `SqliteSessionStore`, `SqliteWorkflowStore`, and `close()`.
+
+For online deployments, use `@lunar/storage-http`:
+
+```ts
+import { createHttpStores } from '@lunar/storage-http';
+
+const storage = createHttpStores({
+  baseUrl: process.env.STORAGE_HTTP_BASE_URL!,
+  token: process.env.STORAGE_HTTP_TOKEN,
+});
+const runtime = await createRuntime({
+  runStore: storage.runStore,
+  sessionStore: storage.sessionStore,
+  workflowStore: storage.workflowStore,
+});
+```
+
+The HTTP provider is intentionally generic so a future Unknown Planet service
+can implement the same storage contract.
+
+For SQL deployments, `@lunar/storage-bun-sql` supports SQLite, PostgreSQL,
+MySQL, and MariaDB through Bun.SQL. For MongoDB, pass a database handle from
+the official MongoDB SDK to `createMongoStores()`. Unknown Planet can expose a
+separate SDK adapter in its own repository using `StorageBundle`.
 
 The adapter initializes its tables and schema version automatically. It stores
 records as JSON and supports the `get()` and `save()` methods required by the

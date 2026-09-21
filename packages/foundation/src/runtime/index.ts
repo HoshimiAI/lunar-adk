@@ -63,7 +63,7 @@ interface ActiveRun {
 
 export async function createRuntime(config: RuntimeConfig = {}): Promise<RuntimeHandle> {
   const resolved = resolveConfig(config);
-  const { agents, events } = await bootstrap(resolved);
+  const { agents, events } = await bootstrap(resolved, config.memory);
   const runs = new Map<string, Run>();
   const activeRuns = new Map<string, ActiveRun>();
   const runStore = config.runStore ?? new InMemoryRunStore();

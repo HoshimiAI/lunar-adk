@@ -11,6 +11,10 @@ Release status: v1.2 code-first workflows and managed subagents.
 - [`packages/provider-ai-sdk`](packages/provider-ai-sdk) — `@lunar/provider-ai-sdk`, an AI SDK adapter for foundation model providers.
 - [`packages/provider-openai`](packages/provider-openai) — `@lunar/provider-openai`, an OpenAI model adapter built on the AI SDK.
 - [`packages/storage-sqlite`](packages/storage-sqlite) — `@lunar/storage-sqlite`, durable SQLite run and session storage.
+- [`packages/storage-http`](packages/storage-http) — `@lunar/storage-http`, remote HTTP run, session, and workflow storage.
+- [`packages/storage-bun-sql`](packages/storage-bun-sql) — `@lunar/storage-bun-sql`, Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
+- [`packages/storage-mongo`](packages/storage-mongo) — `@lunar/storage-mongo`, MongoDB collection adapter using an application-provided Mongo SDK client.
+- [`packages/memory-sqlite`](packages/memory-sqlite) — `@lunar/memory-sqlite`, durable SQLite memory records.
 - [`packages/observability-otel`](packages/observability-otel) — `@lunar/observability-otel`, console and OTLP telemetry exporters.
 - [`apps/elysia`](apps/elysia) — API-only Elysia HTTP adapter and runnable application.
 
@@ -39,6 +43,12 @@ The Elysia assistant includes safe `current_time` and `calculate` tools. Try
 asking “What time is it in UTC?” or “Calculate (18 + 6) / 3.”
 
 Copy `apps/elysia/.env.example` to `apps/elysia/.env`, add `OPENAI_API_KEY`, and optionally change `OPENAI_MODEL` or `SQLITE_PATH`.
+
+The Elysia app uses SQLite by default. Set `STORAGE_PROVIDER=postgres` or
+`mysql` with `DATABASE_URL` for remote SQL, or set `STORAGE_PROVIDER=http`,
+`STORAGE_HTTP_BASE_URL`, and optionally `STORAGE_HTTP_TOKEN` for a remote
+storage service. MongoDB and Unknown Planet are standalone adapters for
+applications to configure with their own SDK clients.
 
 Optional observability can be enabled with `LUNAR_TELEMETRY=console` for local
 structured logs or `OTEL_EXPORTER_OTLP_ENDPOINT` for OTLP traces. Content is
@@ -101,7 +111,7 @@ finish once, interrupts before the next model turn, and returns `202` with the
 interrupted and continuation run IDs. Active streaming responses emit a
 `stream.interrupted` event before closing; the continuation is a separate run.
 
-Plugins, memory search, distributed storage, and authentication remain deferred for later releases.
+Plugins, memory search, and authentication remain deferred for later releases.
 
 Approval-required tools pause a run with `status: "waiting_approval"`. Approve or reject the pending request with `POST /runs/<run-id>/approve` or `POST /runs/<run-id>/reject`, passing the returned `approvalId`. Active runs can be cancelled with `POST /runs/<run-id>/cancel`.
 

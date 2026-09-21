@@ -7,6 +7,9 @@ The example service in `apps/elysia` exposes a JSON API backed by an assistant
 agent. Start it with `bun --cwd apps/elysia run dev`; the default base URL is
 `http://localhost:3000`.
 
+The service uses local SQLite storage by default. Set `STORAGE_PROVIDER=http`
+with `STORAGE_HTTP_BASE_URL` to use a remote storage provider.
+
 The adapter exports two factories:
 
 - `createApp(runtime)` builds the Elysia app around an existing

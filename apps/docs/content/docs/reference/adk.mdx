@@ -20,6 +20,8 @@ The stable facade re-exports the APIs most applications need:
 
 Returns a promise for a `RuntimeHandle`. Configure optional `plugins`,
 `runStore`, `sessionStore`, and `workflowStore`; omitted stores are in-memory.
+Provider factories such as `createSqliteStores()` and `createHttpStores()`
+return compatible bundles for local and remote deployments.
 
 The handle exposes `run`, `stream`, `supportsStreaming`, `steer`, `approve`,
 `reject`, `cancel`, `getRun`, `getStoredRun`, `getSession`, `on`,
