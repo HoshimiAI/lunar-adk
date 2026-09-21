@@ -11,7 +11,7 @@ Release status: v1.0 core runtime.
 - [`packages/provider-ai-sdk`](packages/provider-ai-sdk) — `@lunar/provider-ai-sdk`, an AI SDK adapter for foundation model providers.
 - [`packages/provider-openai`](packages/provider-openai) — `@lunar/provider-openai`, an OpenAI model adapter built on the AI SDK.
 - [`packages/storage-sqlite`](packages/storage-sqlite) — `@lunar/storage-sqlite`, durable SQLite run and session storage.
-- [`elysia`](elysia) — Elysia HTTP adapter and runnable application example.
+- [`apps/elysia`](apps/elysia) — API-only Elysia HTTP adapter and runnable application.
 
 ## Install
 
@@ -29,10 +29,17 @@ bun test
 ## Run the Elysia app
 
 ```bash
-bun --cwd elysia run dev
+bun --cwd apps/elysia run dev
 ```
 
-Copy `elysia/.env.example` to `elysia/.env`, add `OPENAI_API_KEY`, and optionally change `OPENAI_MODEL` or `SQLITE_PATH`.
+The service is API-only. Health checks are available at `GET /health`.
+
+The Elysia assistant includes safe `current_time` and `calculate` tools. Try
+asking “What time is it in UTC?” or “Calculate (18 + 6) / 3.”
+
+Copy `apps/elysia/.env.example` to `apps/elysia/.env`, add `OPENAI_API_KEY`, and optionally change `OPENAI_MODEL` or `SQLITE_PATH`.
+
+The Bruno collection in [`bruno/elysia`](bruno/elysia) covers the full API: health, runs, sessions, steering, cancellation, and approval decisions. Set its `baseUrl` environment variable to the running Elysia server; set `runId`, `sessionId`, and `approvalId` as you exercise the dependent requests.
 
 Then call the real agent:
 

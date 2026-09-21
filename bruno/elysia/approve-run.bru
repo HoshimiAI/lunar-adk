@@ -1,0 +1,25 @@
+meta {
+  name: Approve pending run
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/runs/{{runId}}/approve
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "approvalId": "{{approvalId}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

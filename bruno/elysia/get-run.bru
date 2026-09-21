@@ -1,0 +1,15 @@
+meta {
+  name: Get run by id
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/runs/{{runId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Reject pending run
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/runs/{{runId}}/reject
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "approvalId": "{{approvalId}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}

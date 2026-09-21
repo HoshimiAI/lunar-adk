@@ -1,0 +1,15 @@
+meta {
+  name: Cancel run
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/runs/{{runId}}/cancel
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}

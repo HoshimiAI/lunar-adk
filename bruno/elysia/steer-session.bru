@@ -1,0 +1,26 @@
+meta {
+  name: Steer session
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/sessions/{{sessionId}}/steer
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "instruction": "Keep the next answer concise."
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.steered: eq true
+}

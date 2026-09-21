@@ -1,0 +1,15 @@
+meta {
+  name: Get session by id
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/sessions/{{sessionId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+}
