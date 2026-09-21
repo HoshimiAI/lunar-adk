@@ -9,7 +9,7 @@
         "typescript": "5.9.3",
       },
     },
-    "elysia": {
+    "apps/elysia": {
       "name": "@lunar/elysia-app",
       "dependencies": {
         "@lunar/adk": "workspace:*",
@@ -70,7 +70,7 @@
 
     "@lunar/adk": ["@lunar/adk@workspace:packages/adk"],
 
-    "@lunar/elysia-app": ["@lunar/elysia-app@workspace:elysia"],
+    "@lunar/elysia-app": ["@lunar/elysia-app@workspace:apps/elysia"],
 
     "@lunar/foundation": ["@lunar/foundation@workspace:packages/foundation"],
 

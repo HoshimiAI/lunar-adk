@@ -1,0 +1,26 @@
+meta {
+  name: Resume workflow approval
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/workflow-runs/{{workflowRunId}}/resume
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "approvalId": "{{workflowApprovalId}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.workflowRunId: isString
+}

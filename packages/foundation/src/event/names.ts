@@ -13,6 +13,7 @@ export const EVENT_NAMES = [
   "tool.approval_required",
   "workflow.started",
   "workflow.completed",
+  "workflow.failed",
   "memory.created",
   "memory.retrieved",
   "plugin.registered",

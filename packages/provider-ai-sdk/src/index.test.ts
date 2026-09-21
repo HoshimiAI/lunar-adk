@@ -14,6 +14,7 @@ test("creates a foundation provider without leaking AI SDK configuration", () =>
     tools: true,
     structuredOutput: true,
   });
+  expect(provider.stream).toBeFunction();
 });
 
 test("allows adapter capabilities to be overridden", () => {

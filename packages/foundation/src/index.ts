@@ -1,5 +1,5 @@
 export { createRuntime } from "./runtime";
-export type { RuntimeConfig, RuntimeHandle } from "./runtime";
+export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "./runtime";
 
 export { AgentRunError, defineAgent } from "./agent";
 export type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentErrorCode } from "./agent";
@@ -15,13 +15,25 @@ export type {
   ModelToolCall,
   ModelResponse,
   ModelCallOptions,
+  ModelStreamPart,
 } from "./model";
 
 export { definePlugin } from "./plugin";
 export type { Plugin, PluginContext } from "./plugin";
 
 export { defineWorkflow } from "./workflow";
-export type { Workflow, WorkflowConfig, WorkflowStep } from "./workflow";
+export type {
+  Workflow,
+  WorkflowConfig,
+  WorkflowStep,
+  WorkflowContext,
+  WorkflowRun,
+  WorkflowStatus,
+  WorkflowCheckpoint,
+  WorkflowApproval,
+  WorkflowStore,
+} from "./workflow";
+export { InMemoryWorkflowStore, WorkflowApprovalRequired } from "./workflow";
 
 export { createMemory } from "./memory";
 export type { MemoryProvider } from "./memory";

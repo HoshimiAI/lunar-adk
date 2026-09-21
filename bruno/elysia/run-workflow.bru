@@ -1,0 +1,28 @@
+meta {
+  name: Run workflow
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/workflows/{{workflowName}}/run
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "input": {
+      "topic": "Why Bun is useful for TypeScript APIs"
+    }
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.workflowRunId: isString
+}

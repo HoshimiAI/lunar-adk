@@ -1,0 +1,22 @@
+meta {
+  name: Stream assistant
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/run/stream
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+  accept: text/event-stream
+}
+
+body:json {
+  {
+    "input": "Explain why Bun is useful for TypeScript APIs."
+  }
+}

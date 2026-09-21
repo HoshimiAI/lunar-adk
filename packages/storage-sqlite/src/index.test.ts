@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { unlinkSync } from "node:fs";
-import { createRuntime, defineAgent, defineTool } from "@lunar/foundation";
+import { createRuntime, defineAgent, defineTool, defineWorkflow } from "@lunar/foundation";
 import type { ModelProvider } from "@lunar/foundation/model";
 import { createSqliteStores, SQLITE_SCHEMA_VERSION } from "./index";
 
@@ -90,4 +90,25 @@ test("reopens a waiting approval and resumes it", async () => {
   expect(resumed.run.status).toBe("completed");
   second.close();
   unlinkSync(path);
+});
+
+test("persists workflow checkpoints", async () => {
+  const database = new Database(":memory:");
+  const stores = createSqliteStores(database);
+  const runtime = await createRuntime({ workflowStore: stores.workflowStore });
+  runtime.registerWorkflow(defineWorkflow({
+    name: "checkpointed",
+    run: async (ctx) => {
+      await ctx.checkpoint("started", { value: 1 });
+      return "done";
+    },
+  }));
+
+  const result = await runtime.runWorkflow("checkpointed");
+  const stored = await stores.workflowStore.get(result.id);
+
+  expect(stored?.status).toBe("completed");
+  expect(stored?.checkpoints).toHaveLength(1);
+  expect(stored?.checkpoints[0]?.state).toEqual({ value: 1 });
+  stores.close();
 });

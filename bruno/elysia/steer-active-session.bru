@@ -1,0 +1,28 @@
+meta {
+  name: Steer active session
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/sessions/{{activeSteeringSessionId}}/steer
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+}
+
+body:json {
+  {
+    "instruction": "Use a concise answer and change direction immediately."
+  }
+}
+
+assert {
+  res.status: eq 202
+  res.body.status: eq "accepted"
+  res.body.interruptedRunId: isString
+  res.body.continuationRunId: isString
+}

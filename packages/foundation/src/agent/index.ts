@@ -15,6 +15,7 @@ export function defineAgent(config: AgentConfig, bus: EventBus = new EventBus())
   return {
     name: config.name,
     modelId: config.model.id,
+    supportsStreaming: config.model.capabilities.streaming === true && typeof config.model.stream === "function",
     run: (input: string, options?: AgentRunOptions): Promise<AgentRunResult> =>
       runAgentLoop(config, input, bus, options),
   };

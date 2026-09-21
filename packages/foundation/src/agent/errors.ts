@@ -2,6 +2,7 @@ import type { Run } from "../run";
 
 export type AgentErrorCode =
   | "CANCELLED"
+  | "STEERED"
   | "MAX_TOOL_ROUNDS"
   | "EXECUTION_FAILED"
   | "APPROVAL_REQUIRED"

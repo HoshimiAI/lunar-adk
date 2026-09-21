@@ -5,7 +5,17 @@ export { definePlugin } from "@lunar/foundation/plugin";
 export type { Plugin, PluginContext, PluginManifest, PluginPermissions } from "@lunar/foundation/plugin";
 
 export { defineWorkflow } from "@lunar/foundation/workflow";
-export type { Workflow, WorkflowConfig, WorkflowStep, ApprovalHandler } from "@lunar/foundation/workflow";
+export type {
+  Workflow,
+  WorkflowConfig,
+  WorkflowStep,
+  WorkflowContext,
+  WorkflowRun,
+  WorkflowStatus,
+  WorkflowCheckpoint,
+  WorkflowApproval,
+  ApprovalHandler,
+} from "@lunar/foundation/workflow";
 
 export { defineEvaluator } from "@lunar/foundation/evaluation";
 export type { Evaluator, EvaluationScore } from "@lunar/foundation/evaluation";

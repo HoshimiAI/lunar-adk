@@ -7,6 +7,7 @@ export type {
   ModelToolCall,
   ModelResponse,
   ModelCallOptions,
+  ModelStreamPart,
 } from "./types";
 
 export function defineModelProvider(provider: import("./types").ModelProvider) {

@@ -59,3 +59,37 @@ liveTest(
   },
   30_000,
 );
+
+liveTest(
+  "serves production OpenAI streaming requests",
+  async () => {
+    const sqlitePath = `${process.env.TMPDIR ?? "/tmp"}/lunar-elysia-stream-${crypto.randomUUID()}.db`;
+    const previousSqlitePath = process.env.SQLITE_PATH;
+    process.env.SQLITE_PATH = sqlitePath;
+    let app: Awaited<ReturnType<typeof createDefaultApp>> | undefined;
+
+    try {
+      app = await createDefaultApp();
+      const response = await app.handle(
+        new Request("http://localhost/run/stream", {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "text/event-stream" },
+          body: JSON.stringify({ input: "Reply with the exact phrase streaming-ok and nothing else." }),
+        }),
+      );
+      const body = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/event-stream");
+      expect(body).toContain("event: text.delta");
+      expect(body.toLowerCase()).toContain("streaming-ok");
+      expect(body).toContain("event: stream.completed");
+    } finally {
+      if (app?.server) await app.stop();
+      if (previousSqlitePath === undefined) delete process.env.SQLITE_PATH;
+      else process.env.SQLITE_PATH = previousSqlitePath;
+      if (existsSync(sqlitePath)) unlinkSync(sqlitePath);
+    }
+  },
+  30_000,
+);

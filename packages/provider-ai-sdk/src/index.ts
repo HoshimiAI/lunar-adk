@@ -1,9 +1,10 @@
-import { generateText, jsonSchema, type LanguageModel, type ToolSet } from "ai";
+import { generateText, jsonSchema, streamText, type LanguageModel, type ToolSet } from "ai";
 import type {
   ModelCallOptions,
   ModelProvider,
   ModelResponse,
   ModelToolCall,
+  ModelStreamPart,
 } from "@lunar/foundation/model";
 
 export interface AISDKModelProviderOptions {
@@ -42,6 +43,7 @@ function toAISDKMessages(messages: ModelCallOptions["messages"]): unknown[] {
         content: [{
           type: "tool-result",
           toolCallId: message.toolCallId,
+          toolName: message.toolName,
           output: { type: "text", value: message.content },
         }],
       };
@@ -83,6 +85,36 @@ export function createAISDKModelProvider(options: AISDKModelProviderOptions): Mo
         usage: {
           inputTokens: result.usage.inputTokens ?? 0,
           outputTokens: result.usage.outputTokens ?? 0,
+        },
+      };
+    },
+    async *stream(callOptions): AsyncIterable<ModelStreamPart> {
+      const result = streamText({
+        model: options.model,
+        system: callOptions.system,
+        messages: toAISDKMessages(callOptions.messages) as never,
+        tools: toTools(callOptions),
+        abortSignal: callOptions.signal,
+      });
+
+      for await (const text of result.textStream) {
+        yield { type: "text-delta", text };
+      }
+
+      const [text, toolCalls, usage] = await Promise.all([
+        result.text,
+        result.toolCalls,
+        result.usage,
+      ]);
+      yield {
+        type: "response",
+        response: {
+          text,
+          toolCalls: normalizeToolCalls(toolCalls as Array<{ toolCallId: string; toolName: string; input: unknown }>),
+          usage: {
+            inputTokens: usage.inputTokens ?? 0,
+            outputTokens: usage.outputTokens ?? 0,
+          },
         },
       };
     },

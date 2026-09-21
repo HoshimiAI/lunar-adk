@@ -2,7 +2,7 @@
 
 Agent Development Kit — Bun workspace monorepo.
 
-Release status: v1.0 core runtime.
+Release status: v1.2 code-first workflows and managed subagents.
 
 ## Packages
 
@@ -39,7 +39,7 @@ asking “What time is it in UTC?” or “Calculate (18 + 6) / 3.”
 
 Copy `apps/elysia/.env.example` to `apps/elysia/.env`, add `OPENAI_API_KEY`, and optionally change `OPENAI_MODEL` or `SQLITE_PATH`.
 
-The Bruno collection in [`bruno/elysia`](bruno/elysia) covers the full API: health, runs, sessions, steering, cancellation, and approval decisions. Set its `baseUrl` environment variable to the running Elysia server; set `runId`, `sessionId`, and `approvalId` as you exercise the dependent requests.
+The Bruno collection in [`bruno/elysia`](bruno/elysia) covers the full API: health, runs, sessions, steering, workflow runs, cancellation, and approval decisions. Set its `baseUrl` environment variable to the running Elysia server; set `runId`, `sessionId`, `approvalId`, `workflowName`, `workflowRunId`, and `workflowApprovalId` as you exercise the dependent requests.
 
 Then call the real agent:
 
@@ -51,6 +51,37 @@ curl -X POST http://localhost:3000/run \
 
 The response includes `runId`, `sessionId`, and `status`. Send the `sessionId` in a later request to continue the conversation, inspect a run with `GET /runs/:id`, or inspect a session with `GET /sessions/:id`.
 
+Stream an opt-in response with Server-Sent Events:
+
+```bash
+curl -N -X POST http://localhost:3000/run/stream \
+  -H 'content-type: application/json' \
+  -H 'accept: text/event-stream' \
+  -d '{"input":"Explain why Bun is useful for TypeScript APIs."}'
+```
+
+The stream emits named lifecycle events such as `run.started`, `tool.completed`, and `run.completed`, plus `text.delta`, `stream.completed`, and `stream.error`. The final event includes the run and session identifiers. Models without streaming support return `501` with error code `STREAMING_UNSUPPORTED`.
+
+Register flexible code-first workflows with managed subagents:
+
+```ts
+runtime.registerWorkflow(defineWorkflow({
+  name: "research",
+  run: async (ctx) => {
+    const analyst = await ctx.runSubAgent("analyst", "Analyze the topic");
+    await ctx.checkpoint("analysis-complete", { analyst: analyst.output });
+    return analyst.output;
+  },
+}));
+```
+
+Run a workflow through `POST /workflows/<name>/run`, inspect it with
+`GET /workflow-runs/<id>`, or cancel it with `POST /workflow-runs/<id>/cancel`.
+Workflows can pause with `ctx.requestApproval(id, message)` and resume through
+`POST /workflow-runs/<id>/resume`. Checkpoints are persisted by the SQLite
+adapter; workflow code is responsible for using `ctx.resumeFrom` to make
+checkpointed sections idempotent after a restart.
+
 Steer a session before its next turn:
 
 ```bash
@@ -59,7 +90,12 @@ curl -X POST http://localhost:3000/sessions/<session-id>/steer \
   -d '{"instruction":"Keep the next answer concise."}'
 ```
 
-The v1 core intentionally leaves streaming, workflow orchestration, plugins, memory search, distributed storage, and OpenTelemetry exporters for later releases.
+The same endpoint can steer an active run. The runtime lets an in-flight tool
+finish once, interrupts before the next model turn, and returns `202` with the
+interrupted and continuation run IDs. Active streaming responses emit a
+`stream.interrupted` event before closing; the continuation is a separate run.
+
+Plugins, memory search, distributed storage, authentication, and OpenTelemetry exporters remain deferred for later releases.
 
 Approval-required tools pause a run with `status: "waiting_approval"`. Approve or reject the pending request with `POST /runs/<run-id>/approve` or `POST /runs/<run-id>/reject`, passing the returned `approvalId`. Active runs can be cancelled with `POST /runs/<run-id>/cancel`.
 

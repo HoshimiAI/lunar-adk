@@ -1,4 +1,4 @@
-import type { ModelMessage, ModelToolCall } from "../model";
+import type { ModelMessage, ModelResponse, ModelToolCall } from "../model";
 import { executeTool, needsApproval, type Tool } from "../tool";
 import { buildContext, shapeToolResult } from "../context";
 import {
@@ -28,12 +28,14 @@ export async function runAgentLoop(
     agent: config.name,
     model: config.model.id,
     sessionId: options.sessionId,
+    parentRunId: options.parentRunId,
   }));
   const bus = options.eventBus ?? fallbackBus;
   const record = (name: EventName, payload: unknown) => {
     const event = { name, payload, timestamp: Date.now() };
     run = appendEvent(run, event);
     bus.emit(name, payload);
+    options.onEvent?.(event);
   };
 
   if (!options.resumeRun) {
@@ -43,19 +45,32 @@ export async function runAgentLoop(
     record("agent.started", { agent: config.name, runId: run.id, resumed: true });
   }
 
-  try {
-    const continuation = options.continuation;
-    const messages: ModelMessage[] = continuation
+  const continuation = options.continuation;
+  let messages: ModelMessage[] = continuation
       ? [...continuation.messages]
       : [...(options.history ?? []), { role: "user", content: input }];
-    const tools = new Map((config.tools ?? []).map((tool) => [tool.name, tool] as [string, Tool]));
-    const maxRoundtrips = config.maxToolRoundtrips ?? 8;
-    let round = continuation?.round ?? 0;
-    let toolCalls: ModelToolCall[] | undefined = continuation?.toolCalls;
-    let nextToolIndex = continuation?.nextToolIndex ?? 0;
-    let approvedToolCallId = options.approvedToolCallId;
+  const tools = new Map((config.tools ?? []).map((tool) => [tool.name, tool] as [string, Tool]));
+  const maxRoundtrips = config.maxToolRoundtrips ?? 8;
+  let round = continuation?.round ?? 0;
+  let toolCalls: ModelToolCall[] | undefined = continuation?.toolCalls;
+  let nextToolIndex = continuation?.nextToolIndex ?? 0;
+  let approvedToolCallId = options.approvedToolCallId;
+  let interruptionCaptured = false;
+  const captureInterruption = () => {
+    if (interruptionCaptured || options.signal?.reason !== "steered") return;
+    interruptionCaptured = true;
+    options.onInterrupted?.({
+      input,
+      messages: [...messages],
+      round,
+      toolCalls: toolCalls ?? [],
+      nextToolIndex,
+    });
+  };
 
+  try {
     while (true) {
+      captureInterruption();
       throwIfAborted(options.signal);
 
       if (!toolCalls || nextToolIndex >= toolCalls.length) {
@@ -71,8 +86,7 @@ export async function runAgentLoop(
         const context = config.maxContextTokens
           ? buildContext(messages, { maxTokens: config.maxContextTokens })
           : { messages, estimatedTokens: 0 };
-        const response = await withRetry(
-          () => config.model.call({
+        const modelOptions = {
             messages: context.messages,
             system: config.systemPrompt,
             tools: config.model.capabilities.tools === false
@@ -83,10 +97,29 @@ export async function runAgentLoop(
                   inputSchema: tool.schema.toJSONSchema(),
                 })),
             signal: options.signal,
-          }),
-          config.retryPolicy ?? { maxAttempts: 1, backoffMs: () => 0 },
-          options.signal,
-        );
+          };
+        let response: ModelResponse;
+        if (options.streaming) {
+          if (config.model.capabilities.streaming !== true || !config.model.stream) {
+            throw new Error(`Model "${config.model.id}" does not support streaming`);
+          }
+          let streamedResponse: ModelResponse | undefined;
+          for await (const part of config.model.stream(modelOptions)) {
+            if (part.type === "text-delta") {
+              options.onTextDelta?.(run.id, part.text);
+            } else {
+              streamedResponse = part.response;
+            }
+          }
+          if (!streamedResponse) throw new Error("Streaming model ended without a response");
+          response = streamedResponse;
+        } else {
+          response = await withRetry(
+            () => config.model.call(modelOptions),
+            config.retryPolicy ?? { maxAttempts: 1, backoffMs: () => 0 },
+            options.signal,
+          );
+        }
 
         run = addUsage(run, response.usage ?? { inputTokens: 0, outputTokens: 0 });
         record("model.called", { agent: config.name, runId: run.id, round });
@@ -144,6 +177,7 @@ export async function runAgentLoop(
       messages.push({
         role: "tool",
         toolCallId: toolCall.id,
+        toolName: toolCall.name,
         content: !tool ? result.error! : shapeToolResult(result),
       });
       nextToolIndex++;
@@ -154,12 +188,16 @@ export async function runAgentLoop(
 
     const message = error instanceof Error ? error.message : String(error);
     const cancelled = error instanceof DOMException && error.name === "AbortError";
-    const code = cancelled
-      ? "CANCELLED"
+    const code = cancelled && options.signal?.reason === "steered"
+      ? "STEERED"
+      : cancelled
+        ? "CANCELLED"
       : message.includes("exceeded max tool roundtrips")
         ? "MAX_TOOL_ROUNDS"
         : "EXECUTION_FAILED";
+    captureInterruption();
     run = cancelled ? cancelRun(run, message) : failRun(run, message, code);
+    if (code === "STEERED") run = { ...run, errorCode: code };
     record(cancelled ? "run.cancelled" : "agent.failed", { agent: config.name, runId: run.id, error: message });
     if (!cancelled) record("run.failed", { agent: config.name, runId: run.id, error: message });
     throw new AgentRunError(message, run, code, { cause: error });

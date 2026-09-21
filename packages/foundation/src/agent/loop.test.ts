@@ -11,6 +11,60 @@ const stringSchema = {
 };
 
 describe("foundation runtime", () => {
+  test("streams text and lifecycle events while persisting the completed run", async () => {
+    const model: ModelProvider = {
+      id: "streaming",
+      capabilities: { streaming: true },
+      async call() {
+        throw new Error("buffered path should not be used");
+      },
+      async *stream() {
+        yield { type: "text-delta", text: "hel" };
+        yield { type: "text-delta", text: "lo" };
+        yield { type: "response", response: { text: "hello", toolCalls: [] } };
+      },
+    };
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model }));
+
+    const events = [];
+    for await (const event of runtime.stream("assistant", "hello")) events.push(event);
+
+    expect(events.filter((event) => event.type === "text.delta").map((event) => event.type === "text.delta" ? event.text : "")).toEqual(["hel", "lo"]);
+    expect(events.filter((event) => event.type === "event").map((event) => event.type === "event" ? event.event.name : "")).toEqual([
+      "run.started",
+      "agent.started",
+      "model.called",
+      "agent.completed",
+      "run.completed",
+    ]);
+    const completed = events.at(-1);
+    expect(completed?.type).toBe("stream.completed");
+    if (completed?.type === "stream.completed") {
+      expect(completed.result.output).toBe("hello");
+      const stored = await runtime.getStoredRun(completed.result.run.id);
+      expect(stored?.status).toBe("completed");
+    }
+  });
+
+  test("reports when an agent cannot stream", async () => {
+    const model: ModelProvider = {
+      id: "buffered-only",
+      capabilities: {},
+      async call() {
+        return { text: "buffered", toolCalls: [] };
+      },
+    };
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model }));
+
+    expect(runtime.supportsStreaming("assistant")).toBe(false);
+    const consume = async () => {
+      for await (const _event of runtime.stream("assistant", "hello")) return;
+    };
+    await expect(consume()).rejects.toThrow("does not support streaming");
+  });
+
   test("persists lifecycle events on a successful run", async () => {
     const model: ModelProvider = {
       id: "success",
@@ -270,6 +324,132 @@ describe("foundation runtime", () => {
 
     expect(cancelled?.status).toBe("cancelled");
     await expect(pending).rejects.toMatchObject({ code: "CANCELLED" });
+  });
+
+  test("interrupts an active run and starts a linked continuation", async () => {
+    let calls = 0;
+    let sessionId: string | undefined;
+    const prompts: string[][] = [];
+    const model: ModelProvider = {
+      id: "steer-active-model",
+      capabilities: {},
+      async call({ messages, signal }) {
+        calls++;
+        prompts.push(messages.map((message) => `${message.role}:${message.content}`));
+        if (calls === 1) {
+          await new Promise<never>((_, reject) => {
+            signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          });
+        }
+        return { text: "continued", toolCalls: [] };
+      },
+    };
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model }));
+    sessionId = "steering-session";
+    const pending = runtime.run("assistant", "first", { sessionId });
+    while (calls === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const steering = await runtime.steer(sessionId, "Use a concise answer.");
+    expect(steering).toMatchObject({ status: "accepted", sessionId });
+    if (!("status" in steering)) throw new Error("Expected active steering result");
+
+    await expect(pending).rejects.toMatchObject({ code: "STEERED" });
+    let continuation = await runtime.getStoredRun(steering.continuationRunId);
+    while (!continuation || continuation.status === "running" || continuation.status === "pending") {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      continuation = await runtime.getStoredRun(steering.continuationRunId);
+    }
+
+    expect(continuation.status).toBe("completed");
+    expect(continuation.parentRunId).toBe(steering.interruptedRunId);
+    expect(prompts[1]).toContain("system:Use a concise answer.");
+  });
+
+  test("finishes an active tool once before steering", async () => {
+    let releaseTool!: () => void;
+    let toolStarted!: () => void;
+    const toolReady = new Promise<void>((resolve) => { toolStarted = resolve; });
+    let toolCalls = 0;
+    const model: ModelProvider = {
+      id: "steer-tool-model",
+      capabilities: { tools: true },
+      async call({ messages }) {
+        if (messages.every((message) => message.role !== "tool")) {
+          return { text: "", toolCalls: [{ id: "slow-call", name: "slow", input: "x" }] };
+        }
+        return { text: "continued-after-tool", toolCalls: [] };
+      },
+    };
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({
+      name: "assistant",
+      model,
+      tools: [{
+        name: "slow",
+        description: "A slow tool",
+        schema: stringSchema,
+        execute: async () => {
+          toolCalls++;
+          toolStarted();
+          await new Promise<void>((resolve) => { releaseTool = resolve; });
+          return "tool-result";
+        },
+      }],
+    }));
+    const pending = runtime.run("assistant", "first", { sessionId: "steering-tool-session" });
+    await toolReady;
+    const steering = await runtime.steer("steering-tool-session", "Change direction.");
+    expect(steering).toMatchObject({ status: "accepted" });
+    releaseTool();
+    await expect(pending).rejects.toMatchObject({ code: "STEERED" });
+    if (!("status" in steering)) throw new Error("Expected active steering result");
+
+    let continuation = await runtime.getStoredRun(steering.continuationRunId);
+    while (!continuation || continuation.status === "running" || continuation.status === "pending") {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      continuation = await runtime.getStoredRun(steering.continuationRunId);
+    }
+
+    expect(toolCalls).toBe(1);
+    expect(continuation.status).toBe("completed");
+  });
+
+  test("emits a stream interruption handoff when steering an active stream", async () => {
+    let calls = 0;
+    const model: ModelProvider = {
+      id: "steer-stream-model",
+      capabilities: { streaming: true },
+      async call() {
+        throw new Error("buffered path should not be used");
+      },
+      async *stream({ signal }) {
+        calls++;
+        if (calls === 1) {
+          await new Promise<never>((_, reject) => {
+            signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          });
+        }
+        yield { type: "response", response: { text: "streamed continuation", toolCalls: [] } };
+      },
+    };
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model }));
+    const eventsPromise = (async () => {
+      const events = [];
+      for await (const event of runtime.stream("assistant", "first", { sessionId: "steering-stream-session" })) {
+        events.push(event);
+      }
+      return events;
+    })();
+    while (calls === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const steering = await runtime.steer("steering-stream-session", "Use a concise answer.");
+    const events = await eventsPromise;
+
+    expect(steering).toMatchObject({ status: "accepted" });
+    expect(events.some((event) => event.type === "stream.interrupted")).toBe(true);
+    expect(events.some((event) => event.type === "stream.error")).toBe(false);
   });
 
   test("serializes concurrent runs for one session", async () => {
