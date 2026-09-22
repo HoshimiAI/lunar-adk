@@ -115,3 +115,22 @@ test("persists workflow checkpoints", async () => {
   expect(stored?.checkpoints[0]?.state).toEqual({ value: 1 });
   stores.close();
 });
+
+test("lists only running workflows for recovery", async () => {
+  const stores = createSqliteStores(new Database(":memory:"));
+  const base = {
+    workflow: "recoverable",
+    version: "1",
+    input: {},
+    state: {},
+    checkpoints: [],
+    childRunIds: [],
+    startedAt: 1,
+    approvedApprovalIds: [],
+  };
+  await stores.workflowStore.save({ ...base, id: "running", status: "running" });
+  await stores.workflowStore.save({ ...base, id: "waiting", status: "waiting_approval" });
+
+  expect((await stores.workflowStore.listRecoverable?.())?.map((run) => run.id)).toEqual(["running"]);
+  stores.close();
+});

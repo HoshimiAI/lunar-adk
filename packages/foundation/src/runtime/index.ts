@@ -76,7 +76,9 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   if (storage?.capabilities?.atomicRunSession && !storage.saveRunAndSession) {
     throw new Error("Storage declares atomic run/session support without implementing saveRunAndSession");
   }
-  const { agents, events, memory, workflows } = await bootstrap(resolved, config.memory);
+  const bootstrapped = await bootstrap(resolved, config.memory);
+  const { agents, events, memory, workflows } = bootstrapped;
+  let pluginStatus: "enabled" | "disabled" = "enabled";
   const defaultMemoryProviderId = configuredMemoryProviders[0]?.id ?? "in-memory";
   const runs = new Map<string, Run>();
   const activeRuns = new Map<string, ActiveRun>();
@@ -87,6 +89,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   const observability = new ObservabilityHub(config.observability);
   events.onAny((event) => observability.recordEvent(event));
   const activeWorkflows = new Map<string, { controller: AbortController; promise: Promise<WorkflowRun> }>();
+  let workflowRecovery: Promise<WorkflowRun[]> | undefined;
   const sessionLocks = new Map<string, Promise<void>>();
 
   async function withSessionLock<Result>(sessionId: string, operation: () => Promise<Result>): Promise<Result> {
@@ -151,10 +154,12 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       try {
         const memories = await memoryProvider.retrieve({
           text: input,
+          ...(config.embedding ? { embedding: await config.embedding.embed(input) } : {}),
           limit: agent.memory?.retrieveLimit ?? 5,
           namespace: agent.memory?.namespace,
           filter: agent.memory?.filter,
           tenantId: options.tenantId,
+          ownerId: options.ownerId,
         });
         if (memories.length > 0) {
           memoryHistory = [{
@@ -178,6 +183,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       sessionId: session.id,
       parentRunId: options.parentRunId,
       tenantId: options.tenantId ?? session.tenantId,
+      ownerId: options.ownerId ?? session.ownerId,
     });
     const sessionForRun = options.continuation
       ? session
@@ -216,6 +222,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
             namespace: agent.memory?.namespace,
             metadata: { ...agent.memory?.filter, agent: agent.name, ...(session.id ? { sessionId: session.id } : {}) },
             tenantId: options.tenantId ?? session.tenantId,
+            ownerId: options.ownerId ?? session.ownerId,
           });
           events.emit("memory.created", { agent: agent.name, providerId: memoryProvider.id, memoryId: record.id });
         } catch (error) {
@@ -243,7 +250,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     return saved;
   }
 
-  async function executeWorkflow(workflow: Workflow, input: unknown, existing?: WorkflowRun, approvedApprovalId?: string, tenantId?: string): Promise<WorkflowRun> {
+  async function executeWorkflow(workflow: Workflow, input: unknown, existing?: WorkflowRun, approvedApprovalId?: string, tenantId?: string, ownerId?: string): Promise<WorkflowRun> {
     const controller = new AbortController();
     const run: WorkflowRun = existing
       ? {
@@ -268,6 +275,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           startedAt: Date.now(),
           approvedApprovalIds: [],
           ...(tenantId ? { tenantId } : {}),
+          ...(ownerId ? { ownerId } : {}),
     };
     await saveWorkflow(run);
     events.emit("workflow.started", { workflow: workflow.name, workflowRunId: run.id, resumed: Boolean(existing) });
@@ -301,13 +309,14 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
         if (!agent) throw new Error(`Unknown agent: ${String(agentRef)}`);
         const sessionId = options.sessionId;
         const session = sessionId
-          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(tenantId), id: sessionId })
-          : createSession(tenantId);
+          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(tenantId, run.ownerId), id: sessionId })
+          : createSession(tenantId, run.ownerId);
         const result = await executeAgent(agent.name, agentInput, session, {
           signal: controller.signal,
           sessionId: session.id,
           parentRunId: run.id,
           tenantId: run.tenantId,
+          ownerId: run.ownerId,
         });
         run.childRunIds = [...new Set([...run.childRunIds, result.run.id])];
         await saveWorkflow(run);
@@ -344,11 +353,11 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
 
   return {
     async run(agentName, input, options) {
-      const sessionId = options?.sessionId ?? createSession(options?.tenantId).id;
+      const sessionId = options?.sessionId ?? createSession(options?.tenantId, options?.ownerId).id;
       return withSessionLock(sessionId, async () => {
         const session = options?.sessionId
-          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(options?.tenantId), id: sessionId })
-          : { ...createSession(options?.tenantId), id: sessionId };
+          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(options?.tenantId, options?.ownerId), id: sessionId })
+          : { ...createSession(options?.tenantId, options?.ownerId), id: sessionId };
         return executeAgent(agentName, input, session, options);
       });
     },
@@ -364,13 +373,13 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
         throw new Error(`Model for agent "${agentName}" does not support streaming`);
       }
 
-      const sessionId = options?.sessionId ?? createSession(options?.tenantId).id;
+      const sessionId = options?.sessionId ?? createSession(options?.tenantId, options?.ownerId).id;
       const queue = new AsyncQueue<RuntimeStreamEvent>();
       let steeringNotified = false;
       const operation = withSessionLock(sessionId, async () => {
         const session = options?.sessionId
-          ? (await sessionStore.get(sessionId)) ?? { ...createSession(options?.tenantId), id: sessionId }
-          : { ...createSession(options?.tenantId), id: sessionId };
+          ? (await sessionStore.get(sessionId)) ?? { ...createSession(options?.tenantId, options?.ownerId), id: sessionId }
+          : { ...createSession(options?.tenantId, options?.ownerId), id: sessionId };
         return executeAgent(agentName, input, session, {
           ...options,
           streaming: true,
@@ -534,8 +543,17 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       return session ? normalizeSession(session) : undefined;
     },
     getMemoryProvider: (id = defaultMemoryProviderId) => memory.get(id),
+    listPlugins: () => bootstrapped.plugins.map(({ id, version, description, dependencies }) => ({
+      id,
+      version,
+      ...(description ? { description } : {}),
+      ...(dependencies ? { dependencies: [...dependencies] } : {}),
+      status: pluginStatus,
+    })),
     on: (event, handler) => events.on(event, handler),
     async shutdown() {
+      await bootstrapped.shutdownPlugins();
+      pluginStatus = "disabled";
       await observability.shutdown();
       if (config.ownsStorage) await storage?.close?.();
       if (config.ownsMemory) {
@@ -547,7 +565,28 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     runWorkflow(name, input, options) {
       const workflow = workflows.get(name);
       if (!workflow) return Promise.reject(new Error(`Unknown workflow: ${name}`));
-      return executeWorkflow(workflow, input, undefined, undefined, options?.tenantId);
+      return executeWorkflow(workflow, input, undefined, undefined, options?.tenantId, options?.ownerId);
+    },
+    recoverWorkflows() {
+      if (workflowRecovery) return workflowRecovery;
+      if (!workflowStore.listRecoverable) {
+        return Promise.reject(new Error("Workflow store does not support recovery listing"));
+      }
+      workflowRecovery = (async () => {
+        const recoverable = await workflowStore.listRecoverable!();
+        const recovered: WorkflowRun[] = [];
+        for (const run of recoverable) {
+          const workflow = workflows.get(run.workflow);
+          if (!workflow) {
+            throw new Error(`Cannot recover workflow run ${run.id}: workflow '${run.workflow}' is not registered`);
+          }
+          recovered.push(await executeWorkflow(workflow, run.input, run, undefined, run.tenantId, run.ownerId));
+        }
+        return recovered;
+      })().finally(() => {
+        workflowRecovery = undefined;
+      });
+      return workflowRecovery;
     },
     getWorkflowRun: (id) => workflowStore.get(id),
     async resumeWorkflow(id, approvalId) {

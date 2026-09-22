@@ -10,3 +10,22 @@ test("stores records in Bun.SQL SQLite mode", async () => {
   await verifyStorageBundle(stores);
   await stores.close();
 });
+
+test("lists running workflows for recovery", async () => {
+  const stores = await createBunSqlStores({ connection: ":memory:", dialect: "sqlite" });
+  const base = {
+    workflow: "recoverable",
+    version: "1",
+    input: {},
+    state: {},
+    checkpoints: [],
+    childRunIds: [],
+    startedAt: 1,
+    approvedApprovalIds: [],
+  };
+  await stores.workflowStore.save({ ...base, id: "running", status: "running" });
+  await stores.workflowStore.save({ ...base, id: "completed", status: "completed" });
+
+  expect((await stores.workflowStore.listRecoverable?.())?.map((run) => run.id)).toEqual(["running"]);
+  await stores.close();
+});

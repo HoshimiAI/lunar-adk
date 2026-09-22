@@ -1,0 +1,133 @@
+---
+title: Capabilities
+description: Complete feature and package inventory for Lunar ADK
+---
+
+This page is the product-level map of shipped Lunar ADK capabilities. Use
+`@lunar/adk` for application code, `@lunar/foundation` subpaths for advanced
+integrations, and the separate adapter packages for external systems.
+
+Lunar Foundation defines the contracts for agents, models, tools, workflows,
+events, storage, and memory. `@lunar/adk` is the stable application facade;
+provider and persistence packages implement those contracts without coupling
+the runtime to a specific vendor or database. The runtime uses in-memory stores
+by default and accepts storage bundles and memory providers when durability is
+needed.
+
+## Runtime and agents
+
+- Register any number of named agents and invoke them with `run()`.
+- Stream text and lifecycle events with `stream()` when the model provider
+  declares streaming support.
+- Pass session history, tenant IDs, cancellation signals, parent-run IDs, and
+  event or text callbacks through `AgentRunOptions`.
+- Configure prompts, tools, retry policy, tool-roundtrip and context-token
+  limits, and opt-in memory per agent.
+- Cancel active work, inspect live or persisted runs, and steer an idle or
+  active session. Steering an active run produces a continuation run after the
+  current tool operation finishes.
+- Pause approval-required tool calls and continue them with `approve()` or
+  finish them with `reject()`.
+
+See [agents and tools](/docs/guides/agents-and-tools) and
+[runs and sessions](/docs/guides/runs-and-sessions).
+
+## Tools and models
+
+- Tools have a name, description, validating `parse()` schema, JSON Schema
+  representation, and sync or async executor.
+- Mark a tool with `permission: { requiresApproval: true }` to require an
+  explicit decision before execution.
+- Model providers advertise streaming, tool, vision, and structured-output
+  capabilities. Their contract supports final calls, optional streams, tool
+  calls, token usage, and abort signals.
+- The included OpenAI adapter is built on the AI SDK; the generic AI SDK adapter
+  accepts any compatible `LanguageModel`. Custom providers can implement the
+  small foundation contract directly.
+
+See [models and providers](/docs/guides/models-and-providers).
+
+## Durable state, sessions, and memory
+
+- Runs keep status, timestamps, events, spans, artifacts, usage, result or
+  error, pending approvals, and continuation state.
+- Sessions retain multi-turn model history and their related run IDs.
+- Workflows persist inputs, state, checkpoints, child-run IDs, approvals, and
+  terminal output or errors.
+- Storage bundles provide revision-aware optimistic concurrency. PostgreSQL
+  Bun.SQL and SQLite bundles atomically save a run and its session; HTTP,
+  MySQL, and MongoDB bundles provide separate revision-safe writes.
+- Agent memory retrieves relevant records before a new run and can optionally
+  store completed conversations. Providers support namespaces, metadata filters,
+  tenant scope, limits, optional score thresholds, listing, deletion, and
+  cleanup.
+
+Available storage: SQLite, Bun.SQL (SQLite, PostgreSQL, MySQL/MariaDB), HTTP,
+and application-supplied MongoDB collections. Available memory: in-memory,
+SQLite, and tenant-scoped PostgreSQL full-text search through Bun.SQL.
+
+See [persistence](/docs/guides/persistence).
+
+## Workflows and subagents
+
+- Define code-first workflows with checkpointing, cancellation, state, parallel
+  tasks, managed child-agent runs, and human approval pauses.
+- Resume a waiting workflow with an approval ID, or cancel a pending/running
+  workflow.
+- Build simple declarative trees with `sequential`, `parallel`, `conditional`,
+  and approval steps.
+
+See [workflows](/docs/guides/workflows).
+
+## Extensibility, evaluation, and events
+
+- Plugins are dependency-ordered at runtime bootstrap and receive registries for
+  agents, tools, memory, workflows, evaluators, events, commands, and schemas.
+- Plugins can declare dependency IDs and may use the provided network and
+  filesystem permission checks in their own registration code.
+- Evaluators score a completed `Run`; the evaluation module provides evaluator
+  registration and score normalization.
+- Subscribe to agent, model, tool, workflow, memory, plugin, and run lifecycle
+  events. The supported names are exported as `EVENT_NAMES`.
+- Build bounded model context with helpers for estimating tokens, selecting
+  recent messages, truncating messages, and shaping tool results.
+
+These advanced contracts are documented in the
+[Foundation reference](/docs/reference/foundation).
+
+## Security and observability
+
+- The runtime accepts an application `AuthProvider`; the Better Auth adapter
+  converts Better Auth sessions to Lunar `AuthPrincipal` values.
+- The Elysia reference service applies tenant ownership checks and separate
+  `memory:read`, `memory:write`, and `memory:delete` permissions to memory
+  endpoints.
+- Observability exports event and completed-run telemetry. Built-in adapters
+  emit JSON console records or OTLP trace payloads. Prompt, output, and tool
+  content stays excluded unless `captureContent: true` is set.
+
+See [security](/docs/security), [observability](/docs/observability), and the
+[HTTP API reference](/docs/reference/http-api).
+
+## Public packages
+
+| Package | Capability |
+| --- | --- |
+| `@lunar/adk` | Stable application facade for runtime, agents, tools, models, runs, sessions, memory, workflows, storage types, and auth/telemetry types |
+| `@lunar/adk/experimental` | Experimental plugin and evaluation APIs |
+| `@lunar/foundation` | Provider-neutral runtime contracts and helpers; advanced modules are exported from subpaths |
+| `@lunar/provider-openai` | OpenAI model provider factory |
+| `@lunar/provider-ai-sdk` | Generic AI SDK model provider factory |
+| `@lunar/storage-sqlite` | Bun SQLite storage bundle |
+| `@lunar/storage-bun-sql` | Bun.SQL SQLite, PostgreSQL, and MySQL storage bundle |
+| `@lunar/storage-http` | Revision-aware remote HTTP storage bundle |
+| `@lunar/storage-mongo` | MongoDB collection-contract storage bundle |
+| `@lunar/memory-sqlite` | Bun SQLite memory provider |
+| `@lunar/memory-bun-sql` | PostgreSQL full-text, tenant-scoped memory provider |
+| `@lunar/observability-otel` | Console and OTLP exporters |
+| `@lunar/auth-better-auth` | Better Auth to Lunar auth-provider adapter |
+
+The [ADK facade](/docs/reference/adk),
+[Foundation](/docs/reference/foundation), and
+[adapter reference](/docs/reference/adapters) list the exported API for each
+surface.

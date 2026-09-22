@@ -92,6 +92,14 @@ class BunSqlStore<T extends StoredRecord> {
     return this.getUsing(this.client, id, false);
   }
 
+  async listRecoverable(): Promise<T[]> {
+    const table = quoteTable(this.resource);
+    const rows = await this.client.unsafe(`SELECT value FROM ${table}`) as unknown as { value: string }[];
+    return rows
+      .map((row) => JSON.parse(String((row as { value: string }).value)) as T)
+      .filter((value) => (value as T & { status?: string }).status === "running");
+  }
+
   private async getUsing(client: SQL, id: string, forUpdate: boolean): Promise<T | undefined> {
     const table = quoteTable(this.resource);
     const lock = forUpdate ? " FOR UPDATE" : "";

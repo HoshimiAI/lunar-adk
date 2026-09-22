@@ -3,7 +3,9 @@ title: "API: @lunar/adk"
 description: Stable application-facing Lunar ADK exports
 ---
 
-The stable facade re-exports the APIs most applications need:
+The stable facade re-exports the APIs most applications need, including memory
+and workflows. Plugin and evaluation APIs are intentionally experimental and
+are exported from `@lunar/adk/experimental` instead.
 
 | Export | Purpose |
 | --- | --- |
@@ -13,6 +15,7 @@ The stable facade re-exports the APIs most applications need:
 | `defineModelProvider` | Mark a provider as a foundation model provider |
 | `createSession` | Create an empty session |
 | `defineWorkflow` | Create a resumable workflow |
+| `createMemory`, `createInMemoryProvider`, `MemoryRegistry` | Configure optional long-term memory |
 | `InMemoryRunStore`, `InMemorySessionStore`, `InMemoryWorkflowStore` | Development stores |
 | `AgentRunError`, `WorkflowApprovalRequired` | Execution and approval errors |
 
@@ -23,7 +26,9 @@ Returns a promise for a `RuntimeHandle`. Configure optional `plugins`,
 Provider factories such as `createSqliteStores()` and `createHttpStores()`
 return compatible bundles for local and remote deployments.
 
-Pass a complete `storage` bundle to compose all three stores at once. Set
+Pass a complete `storage` bundle to compose all three stores at once. Configure
+one or more memory providers with `memory`; `ownsMemory: true` makes
+`runtime.shutdown()` close them. Set
 `ownsStorage: true` when the runtime should close that bundle from
 `runtime.shutdown()`; application-managed bundles should leave it unset. A
 bundle cannot be mixed with individual store overrides.
@@ -85,3 +90,14 @@ The facade exports `Agent`, `AgentConfig`, `AgentRunOptions`, `AgentRunResult`,
 `Tool`, `ToolResult`, `ModelProvider`, `ModelResponse`, `ModelStreamPart`,
 `Run`, `Session`, `Workflow`, `WorkflowRun`, and their related status and store
 types. See the concept guides for behavior and examples.
+
+## `@lunar/adk/experimental`
+
+This subpath exposes the currently experimental extension surface:
+
+- `definePlugin` and the `Plugin`, `PluginContext`, `PluginManifest`, and
+  `PluginPermissions` types;
+- `defineEvaluator` and the `Evaluator` and `EvaluationScore` types;
+
+For all underlying helpers and subpath modules, use the
+[Foundation reference](/docs/reference/foundation).

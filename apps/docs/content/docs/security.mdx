@@ -25,3 +25,35 @@ tenant and permission model. Curated memory endpoints require `memory:read`,
 For Elysia, use `createAppWithBetterAuth(runtime, { betterAuth, mapPrincipal })`.
 It mounts Better Auth's `/api/auth` handler and protects Lunar routes with the
 same verified session.
+
+## Request quotas
+
+Pass `rateLimit` to `createApp()` (or `createAppWithBetterAuth()`) to enable
+token-bucket request limits. The default app reads `RATE_LIMIT_MAX_REQUESTS`,
+`RATE_LIMIT_WINDOW_MS`, and `RATE_LIMIT_TENANT_QUOTAS` from the environment;
+see `apps/elysia/.env.example`. Authenticated requests are counted by verified
+tenant ID; optional tenant-specific quotas override the default. The full quota
+is available as a burst and replenishes evenly over `windowMs`. Health,
+readiness, and auth-handler routes are exempt. Rejected requests return `429`
+with `Retry-After` and `X-RateLimit-*` headers.
+
+```ts
+createApp(runtime, {
+  auth,
+  rateLimit: {
+    windowMs: 60_000,
+    maxRequests: 120,
+    tenantQuotas: { "free-tier": 30, "enterprise": 600 },
+  },
+});
+```
+
+The default in-memory store bounds its active tenant entries, expires old
+windows when it needs capacity, and returns `503` if it cannot safely track a
+new tenant. Its counters reset on restart and are not shared across app
+instances. For multiple instances, pass a `rateLimitStore` implementing
+`RateLimitStore.consume()` with an atomic shared-store operation, or enforce
+quotas at a shared gateway. Store failures return `503` rather than bypassing
+the quota. When auth is not configured, all requests share one anonymous
+quota bucket. Limits count HTTP requests equally; they are not token or cost
+budgets.

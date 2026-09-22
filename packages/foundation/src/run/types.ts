@@ -17,6 +17,7 @@ export interface Run<Result = unknown> {
   model?: string;
   sessionId?: string;
   tenantId?: string;
+  ownerId?: string;
   parentRunId?: string;
   status: RunStatus;
   startedAt: number;

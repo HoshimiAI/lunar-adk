@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { createRuntime, defineAgent, defineTool, defineWorkflow } from "@lunar/adk";
+import { createRuntime, defineAgent, definePlugin, defineTool, defineWorkflow, InMemoryWorkflowStore } from "@lunar/adk";
 import type { ModelProvider } from "@lunar/adk";
-import { createApp, createAppWithBetterAuth } from "./app";
+import { createApp, createAppWithBetterAuth, createInMemoryRateLimitStore } from "./app";
 import { calculatorTool, currentTimeTool } from "./tools";
 
 const testModel: ModelProvider = {
@@ -21,6 +21,32 @@ async function createTestApp() {
 }
 
 describe("Elysia app", () => {
+  test("exposes installed plugin bundles and runs their workflows", async () => {
+    const runtime = await createRuntime({
+      plugins: [definePlugin({
+        id: "greeting",
+        version: "1.0.0",
+        register(context) {
+          context.workflows.register(defineWorkflow({
+            name: "greet",
+            async run({ input }) { return { message: `Hello, ${(input as { name: string }).name}!` }; },
+          }));
+        },
+      })],
+    });
+    const app = await createApp(runtime);
+
+    const plugins = await app.handle(new Request("http://localhost/plugins"));
+    const workflow = await app.handle(new Request("http://localhost/workflows/greet/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: { name: "Lunar" } }),
+    }));
+
+    expect(await plugins.json()).toEqual({ plugins: [{ id: "greeting", version: "1.0.0", status: "enabled" }] });
+    expect(await workflow.json()).toMatchObject({ status: "completed", output: { message: "Hello, Lunar!" } });
+  });
+
   test("mounts Better Auth while protecting Lunar routes", async () => {
     const runtime = await createRuntime();
     runtime.registerAgent(defineAgent({ name: "assistant", model: testModel }));
@@ -64,6 +90,129 @@ describe("Elysia app", () => {
     expect(inspected.status).toBe(404);
   });
 
+  test("isolates sessions, runs, and memories between users in one tenant", async () => {
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model: testModel }));
+    const app = await createApp(runtime, {
+      auth: { async authenticate(request) {
+        const subjectId = request.headers.get("authorization") === "Bearer user-b" ? "user-b" : "user-a";
+        return { subjectId, tenantId: "tenant-a", permissions: ["memory:read", "memory:write"] };
+      } },
+    });
+    const request = (path: string, token: string, init?: RequestInit) => app.handle(new Request(`http://localhost${path}`, {
+      ...init,
+      headers: { ...(init?.headers as Record<string, string> | undefined), ...(init?.body ? { "content-type": "application/json" } : {}), authorization: `Bearer ${token}` },
+    }));
+    const created = await request("/run", "user-a", { method: "POST", body: JSON.stringify({ input: "private context" }) });
+    const run = await created.json();
+    const ownerRun = await request(`/runs/${run.runId}`, "user-a");
+    const otherRun = await request(`/runs/${run.runId}`, "user-b");
+    const otherSession = await request(`/sessions/${run.sessionId}`, "user-b");
+    const memory = await request("/memories", "user-a", { method: "POST", body: JSON.stringify({ content: "private memory", expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+    const otherMemories = await request("/memories", "user-b");
+
+    expect(ownerRun.status).toBe(200);
+    expect(otherRun.status).toBe(404);
+    expect(otherSession.status).toBe(404);
+    expect(memory.status).toBe(201);
+    expect((await otherMemories.json()).records).toHaveLength(0);
+  });
+
+  test("enforces tenant-specific request quotas and returns retry headers", async () => {
+    const runtime = await createRuntime();
+    const app = await createApp(runtime, {
+      auth: {
+        async authenticate(request) {
+          const tenantId = request.headers.get("authorization") === "Bearer b" ? "tenant-b" : "tenant-a";
+          return { subjectId: tenantId, tenantId, permissions: [] };
+        },
+      },
+      rateLimit: { windowMs: 60_000, maxRequests: 3, tenantQuotas: { "tenant-a": 1 } },
+    });
+    const request = (token: string) => new Request("http://localhost/runs/missing", { headers: { authorization: `Bearer ${token}` } });
+
+    const first = await app.handle(request("a"));
+    const limited = await app.handle(request("a"));
+    const otherTenant = await app.handle(request("b"));
+
+    expect(first.status).toBe(404);
+    expect(first.headers.get("X-RateLimit-Limit")).toBe("1");
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("Retry-After")).toBeTruthy();
+    expect(await limited.json()).toEqual({ error: "Rate limit exceeded", tenantId: "tenant-a" });
+    expect(otherTenant.status).toBe(404);
+    expect(otherTenant.headers.get("X-RateLimit-Limit")).toBe("3");
+  });
+
+  test("does not rate limit health checks", async () => {
+    const runtime = await createRuntime();
+    const app = await createApp(runtime, { rateLimit: { windowMs: 60_000, maxRequests: 1 } });
+    await app.handle(new Request("http://localhost/runs/missing"));
+
+    const response = await app.handle(new Request("http://localhost/health"));
+
+    expect(response.status).toBe(200);
+  });
+
+  test("recovers workflows before returning the app when enabled", async () => {
+    const store = new InMemoryWorkflowStore();
+    await store.save({
+      id: "startup-recovery",
+      workflow: "startup-recovery",
+      version: "1",
+      status: "running",
+      input: "continue",
+      state: {},
+      checkpoints: [],
+      childRunIds: [],
+      startedAt: 1,
+      approvedApprovalIds: [],
+    });
+    const runtime = await createRuntime({ workflowStore: store });
+    runtime.registerWorkflow(defineWorkflow({ name: "startup-recovery", run: async (ctx) => ctx.input }));
+
+    await createApp(runtime, { recoverWorkflowsOnStartup: true });
+
+    expect((await runtime.getWorkflowRun("startup-recovery"))?.status).toBe("completed");
+  });
+
+  test("applies a tenant quota atomically to concurrent requests", async () => {
+    const runtime = await createRuntime();
+    const app = await createApp(runtime, {
+      auth: { async authenticate() { return { subjectId: "user", tenantId: "tenant-a", permissions: [] }; } },
+      rateLimit: { windowMs: 60_000, maxRequests: 1 },
+    });
+    const responses = await Promise.all([
+      app.handle(new Request("http://localhost/runs/missing")),
+      app.handle(new Request("http://localhost/runs/missing")),
+    ]);
+
+    expect(responses.map(({ status }) => status).sort()).toEqual([404, 429]);
+  });
+
+  test("refills in-memory quota buckets and bounds tenant state", async () => {
+    const store = createInMemoryRateLimitStore(1);
+    const options = { limit: 1, windowMs: 20 };
+    expect(store.consume("tenant-a", options).remaining).toBe(0);
+    expect(() => store.consume("tenant-b", options)).toThrow("Rate limit store capacity exceeded");
+    await Bun.sleep(30);
+    expect(store.consume("tenant-a", options).remaining).toBe(0);
+    await Bun.sleep(30);
+    expect(store.consume("tenant-b", options).remaining).toBe(0);
+  });
+
+  test("fails closed when the configured rate-limit store is unavailable", async () => {
+    const runtime = await createRuntime();
+    const app = await createApp(runtime, {
+      rateLimit: { windowMs: 60_000, maxRequests: 1 },
+      rateLimitStore: { consume() { throw new Error("backend unavailable"); } },
+    });
+    const response = await app.handle(new Request("http://localhost/runs/missing"));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "Rate limiter unavailable" });
+  });
+
   test("manages tenant-scoped curated memory with permissions", async () => {
     const runtime = await createRuntime();
     const principal = { subjectId: "user", tenantId: "tenant-a", permissions: ["memory:read", "memory:write", "memory:delete"] };
@@ -75,6 +224,27 @@ describe("Elysia app", () => {
     expect((await listed.json()).records).toHaveLength(1);
     const deleted = await app.handle(new Request(`http://localhost/memories/${record.id}`, { method: "DELETE" }));
     expect(deleted.status).toBe(200);
+  });
+
+  test("ingests a text upload as embedded, tenant-scoped memory chunks", async () => {
+    const runtime = await createRuntime();
+    const principal = { subjectId: "user", tenantId: "tenant-a", permissions: ["memory:read", "memory:write"] };
+    const embedding = { id: "test-embedding", async embed(input: string) { return [input.length, input.includes("Lunar") ? 1 : 0]; } };
+    const app = await createApp(runtime, { auth: { async authenticate() { return principal; } }, embedding });
+    const form = new FormData();
+    form.set("file", new File(["Lunar keeps uploaded knowledge searchable."], "knowledge.md", { type: "text/markdown" }));
+    form.set("expiresAt", new Date(Date.now() + 60_000).toISOString());
+    form.set("namespace", "knowledge");
+
+    const created = await app.handle(new Request("http://localhost/memories/upload", { method: "POST", body: form }));
+    const payload = await created.json();
+    const listed = await app.handle(new Request("http://localhost/memories?namespace=knowledge"));
+    const page = await listed.json();
+
+    expect(created.status).toBe(201);
+    expect(payload).toMatchObject({ filename: "knowledge.md", chunks: 1, embedded: true });
+    expect(page.records[0]).toMatchObject({ content: "Lunar keeps uploaded knowledge searchable.", tenantId: "tenant-a", embedding: expect.any(Array) });
+    expect(page.records[0].metadata).toMatchObject({ filename: "knowledge.md", embeddingModel: "test-embedding" });
   });
   test("does not serve a GUI", async () => {
     const response = await (await createTestApp()).handle(new Request("http://localhost/"));

@@ -16,6 +16,12 @@ The adapter exports two factories:
   `RuntimeHandle`, which is useful for tests and custom deployments.
 - `createDefaultApp()` creates SQLite storage, configures the OpenAI assistant,
   installs the example tools, and closes storage from the app shutdown hook.
+- `createAppWithBetterAuth(runtime, options)` mounts a Better Auth handler and
+  adapts its session to a Lunar principal through `mapPrincipal`.
+
+Set `recoverWorkflowsOnStartup: true` in either app factory to resume persisted
+running workflows before the app is returned. Register agents and workflows on
+the runtime first; app creation waits for recovery to finish.
 
 All JSON requests use `content-type: application/json`. Input strings must be
 1–32,000 characters, and steering instructions must be 1–4,000 characters.
@@ -70,6 +76,23 @@ approvals return `409`.
 `{ status: "accepted", interruptedRunId, continuationRunId, sessionId }` when
 an active run is interrupted.
 
+## Curated memory
+
+Memory endpoints are available only when the application configures both an
+auth provider and a memory provider. They are tenant-scoped and require the
+stated principal permission:
+
+| Method | Route | Permission | Result |
+| --- | --- | --- | --- |
+| `POST` | `/memories` | `memory:write` | Creates a record with `content`, a future ISO `expiresAt`, and optional `namespace` and `metadata` |
+| `POST` | `/memories/upload` | `memory:write` | Accepts multipart `file` (UTF-8 text, up to 5 MiB) and future ISO `expiresAt`; chunks it into memory records and embeds each chunk when embeddings are configured |
+| `GET` | `/memories` | `memory:read` | Returns a paginated memory page; accepts optional `namespace`, `cursor`, and `limit` query parameters |
+| `DELETE` | `/memories/:id` | `memory:delete` | Deletes a record owned by the current tenant |
+
+Create requests return `201`. Missing memory configuration or records return
+`404`; malformed or expired create input returns `422`; missing permission
+returns `403`.
+
 ## Workflows
 
 | Method | Route | Body / result |
@@ -86,4 +109,6 @@ waiting for approval returns its pending approval in the run response.
 
 Validation errors return `422` with `{ error: "Invalid request", details }`.
 Missing resources return `404`; cancelled agent runs return `409`; unexpected
-agent errors return `500` with the affected `runId`.
+agent errors return `500` with the affected `runId`. When authentication is
+configured, every route except `/health`, `/readyz`, and the configured auth
+route prefix requires a recognized principal.

@@ -80,6 +80,11 @@ export class SqliteWorkflowStore implements WorkflowStore {
       | null;
     return row ? (JSON.parse(row.value) as WorkflowRun) : undefined;
   }
+
+  async listRecoverable(): Promise<WorkflowRun[]> {
+    const rows = this.database.query("SELECT value FROM lunar_workflow_runs").all() as { value: string }[];
+    return rows.map(({ value }) => JSON.parse(value) as WorkflowRun).filter((run) => run.status === "running");
+  }
 }
 
 export class SqliteRunStore implements RunStore {

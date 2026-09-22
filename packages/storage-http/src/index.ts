@@ -72,6 +72,16 @@ class HttpStore<T extends StoredRecord> {
     return response as T;
   }
 
+  async listRecoverable(): Promise<T[]> {
+    const operation = this.listRecoverableWithRetry();
+    this.pending.add(operation);
+    try {
+      return await operation;
+    } finally {
+      this.pending.delete(operation);
+    }
+  }
+
   async close(): Promise<void> {
     await Promise.allSettled(this.pending);
   }
@@ -138,6 +148,52 @@ class HttpStore<T extends StoredRecord> {
             `HTTP storage ${method} ${this.resource}/${id} failed: ${error instanceof Error ? error.message : String(error)}`,
             this.resource,
             id,
+          );
+        }
+      }
+      await delay(this.retryDelayMs * 2 ** (attempt - 1));
+    }
+    throw lastError;
+  }
+
+  private async listRecoverableWithRetry(): Promise<T[]> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+        let response: Response;
+        try {
+          response = await this.fetcher(`${this.baseUrl}/v1/${this.resource}?status=running`, {
+            method: "GET",
+            headers: this.headers,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
+        if (response.ok) {
+          const values: unknown = await response.json();
+          if (Array.isArray(values)) return values as T[];
+          throw new HttpStorageError("HTTP storage recovery listing must return an array", this.resource, "*");
+        }
+        const error = new HttpStorageError(
+          `HTTP storage GET ${this.resource}?status=running failed: ${await response.text() || response.statusText}`,
+          this.resource,
+          "*",
+          response.status,
+        );
+        if (!isRetryable(response.status) || attempt === this.maxAttempts) throw error;
+        lastError = error;
+      } catch (error) {
+        if (error instanceof HttpStorageError && !isRetryable(error.status)) throw error;
+        lastError = error;
+        if (attempt === this.maxAttempts) {
+          if (error instanceof HttpStorageError) throw error;
+          throw new HttpStorageError(
+            `HTTP storage recovery listing failed: ${error instanceof Error ? error.message : String(error)}`,
+            this.resource,
+            "*",
           );
         }
       }

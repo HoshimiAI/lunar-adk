@@ -1,6 +1,6 @@
 ---
 title: "API: providers and storage"
-description: Configure model adapters and SQLite persistence
+description: Configure model, storage, memory, auth, and telemetry adapters
 ---
 
 ## `createOpenAIModelProvider(options)`
@@ -55,6 +55,17 @@ persists memory records and implements the foundation provider's substring
 retrieval and limit behavior. Pass the provider as `memory` to
 `createRuntime()`.
 
+## `createBunSqlMemoryProvider(options)`
+
+Package: `@lunar/memory-bun-sql`
+
+Creates a PostgreSQL memory provider using Bun.SQL. Supply a `connection` URL
+or existing Bun `SQL` client and optionally an `id`. It initializes a
+tenant-scoped, expiry-required memory table with a full-text index. Reads,
+writes, lists, and deletes require `tenantId`; retrieval returns ranked full-text
+matches and supports namespace, metadata-filter, limit, and minimum-score
+queries.
+
 ## `createHttpStores(options)`
 
 Package: `@lunar/storage-http`
@@ -98,3 +109,14 @@ The optional observability package exports `createConsoleExporter()` and
 `createRuntime({ observability: { exporters } })`. Telemetry captures metadata
 only by default; set `captureContent: true` explicitly to include prompts,
 outputs, and tool inputs.
+
+## `createBetterAuthProvider(auth, mapPrincipal)`
+
+Package: `@lunar/auth-better-auth`
+
+Adapts a Better Auth-compatible `api.getSession({ headers })` implementation
+to Lunar's `AuthProvider`. `mapPrincipal` receives `{ user, session }` and
+returns an `AuthPrincipal` with `subjectId`, `tenantId`, and permissions, or
+`undefined` to deny the request. The Elysia app also exports
+`createAppWithBetterAuth()` to mount the Better Auth handler and use this
+adapter together.

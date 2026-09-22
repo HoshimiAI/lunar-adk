@@ -4,6 +4,7 @@ export interface MongoCollection<T> {
   insertOne(document: T): Promise<unknown>;
   replaceOne(filter: Record<string, unknown>, replacement: T, options: { upsert: false }): Promise<{ matchedCount: number }>;
   findOne(filter: { id: string }): Promise<T | null>;
+  find?(filter: Record<string, unknown>): { toArray(): Promise<T[]> };
 }
 
 export interface MongoDatabase {
@@ -47,6 +48,13 @@ class MongoStore<T extends { id: string; revision?: number }> {
 
   async get(id: string): Promise<T | undefined> {
     return (await this.collection.findOne({ id })) ?? undefined;
+  }
+
+  async listRecoverable(): Promise<T[]> {
+    if (!this.collection.find) {
+      throw new Error("Mongo collection does not support workflow recovery listing");
+    }
+    return this.collection.find({ status: "running" }).toArray();
   }
 }
 

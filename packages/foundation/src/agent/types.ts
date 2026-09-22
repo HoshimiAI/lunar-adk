@@ -33,6 +33,7 @@ export interface AgentRunOptions {
   history?: ModelMessage[];
   sessionId?: string;
   tenantId?: string;
+  ownerId?: string;
   eventBus?: EventBus;
   continuation?: RunContinuation;
   resumeRun?: Run<string>;

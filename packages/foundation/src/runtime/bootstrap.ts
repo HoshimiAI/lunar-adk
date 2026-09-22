@@ -3,7 +3,7 @@ import { ToolRegistry } from "../tool";
 import { MemoryRegistry, createInMemoryProvider } from "../memory";
 import { EvaluatorRegistry } from "../evaluation";
 import { EventBus } from "../event";
-import { CommandRegistry, SchemaRegistry, installPlugin, resolveOrder, type PluginContext } from "../plugin";
+import { CommandRegistry, SchemaRegistry, installPlugin, resolveOrder, stopPlugin, type Plugin, type PluginContext } from "../plugin";
 import type { RuntimeConfig } from "./types";
 import type { Workflow } from "../workflow";
 
@@ -14,6 +14,8 @@ export interface Bootstrapped {
   evaluators: EvaluatorRegistry;
   events: EventBus;
   workflows: Map<string, Workflow>;
+  plugins: Plugin[];
+  shutdownPlugins(): Promise<void>;
 }
 
 export async function bootstrap(
@@ -49,10 +51,40 @@ export async function bootstrap(
     schemas: new SchemaRegistry(),
   };
 
-  for (const plugin of resolveOrder(config.plugins)) {
-    await installPlugin(plugin, ctx);
-    events.emit("plugin.registered", { pluginId: plugin.id });
+  const installedPlugins: Plugin[] = [];
+  try {
+    for (const plugin of resolveOrder(config.plugins)) {
+      await installPlugin(plugin, ctx);
+      installedPlugins.push(plugin);
+      events.emit("plugin.registered", { pluginId: plugin.id, version: plugin.version });
+      events.emit("plugin.enabled", { pluginId: plugin.id });
+    }
+  } catch (error) {
+    events.emit("plugin.failed", { error: error instanceof Error ? error.message : String(error) });
+    await Promise.allSettled(installedPlugins.reverse().map((plugin) => stopPlugin(plugin, ctx)));
+    throw error;
   }
 
-  return { agents, tools, memory, evaluators, events, workflows };
+  let pluginsStopped = false;
+  return {
+    agents,
+    tools,
+    memory,
+    evaluators,
+    events,
+    workflows,
+    plugins: installedPlugins,
+    async shutdownPlugins() {
+      if (pluginsStopped) return;
+      pluginsStopped = true;
+      for (const plugin of [...installedPlugins].reverse()) {
+        try {
+          await stopPlugin(plugin, ctx);
+          events.emit("plugin.disabled", { pluginId: plugin.id });
+        } catch (error) {
+          events.emit("plugin.failed", { pluginId: plugin.id, error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+    },
+  };
 }

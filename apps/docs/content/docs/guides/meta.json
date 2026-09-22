@@ -6,6 +6,7 @@
     "models-and-providers",
     "runs-and-sessions",
     "workflows",
+    "subagents",
     "persistence"
   ]
 }

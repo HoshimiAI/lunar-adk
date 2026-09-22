@@ -43,4 +43,20 @@ workflow.
 
 Workflows can also be built from `sequential`, `parallel`, `conditional`, and
 approval steps when a declarative `WorkflowStep` tree is more useful than a
-custom `run` function.
+custom `run` function. See [subagents](/docs/guides/subagents) for child-run
+ownership, sessions, and concurrency guidance.
+
+## Recover after a restart
+
+After registering agents and workflows, call `runtime.recoverWorkflows()` to
+resume persisted runs whose status is still `running`. The built-in memory,
+SQLite, Bun.SQL, MongoDB, and HTTP stores support recovery listing. Custom
+stores must implement `WorkflowStore.listRecoverable()`.
+
+For Elysia, set `recoverWorkflowsOnStartup: true` in `createApp()` or
+`createAppWithBetterAuth()` after registering workflows. App creation waits for
+recovery to finish before returning. Workflows waiting for approval remain
+paused; failed workflows are not automatically retried.
+
+Recovery starts from the latest checkpoint. Any external side effect after
+that checkpoint may run again, so make those operations idempotent.

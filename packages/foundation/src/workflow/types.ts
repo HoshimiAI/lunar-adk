@@ -19,6 +19,7 @@ export interface WorkflowRun {
   id: string;
   revision?: number;
   tenantId?: string;
+  ownerId?: string;
   workflow: string;
   version: string;
   status: WorkflowStatus;
@@ -36,6 +37,7 @@ export interface WorkflowRun {
 
 export interface WorkflowRunOptions {
   tenantId?: string;
+  ownerId?: string;
 }
 
 export interface WorkflowContext {

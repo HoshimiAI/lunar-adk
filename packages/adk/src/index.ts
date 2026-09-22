@@ -1,5 +1,7 @@
 export { createRuntime } from "@lunar/foundation/runtime";
 export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "@lunar/foundation/runtime";
+export { definePlugin } from "@lunar/foundation/plugin";
+export type { Plugin, PluginContext, PluginInfo, PluginManifest, PluginPermissions, PluginStatus } from "@lunar/foundation/plugin";
 export type { AuthPrincipal, AuthProvider } from "@lunar/foundation/auth";
 
 export { AgentRunError, defineAgent } from "@lunar/foundation/agent";

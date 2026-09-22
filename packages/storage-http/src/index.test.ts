@@ -69,3 +69,36 @@ test("retries transient HTTP failures and rejects permanent failures", async () 
   await stores.close?.();
   await failing.close?.();
 });
+
+test("lists recoverable workflows through the HTTP storage contract", async () => {
+  const records = new Map<string, unknown>();
+  const stores = createHttpStores({
+    baseUrl: "https://storage.example",
+    fetch: async (input, init) => {
+      const url = new URL(input as string);
+      if (url.pathname === "/v1/workflow-runs" && url.searchParams.get("status") === "running") {
+        return Response.json([...records.values()].filter((value) => (value as { status?: string }).status === "running"));
+      }
+      if (init?.method === "PUT") {
+        records.set(url.pathname, await new Request(input as string, init).json());
+        return new Response(null, { status: 204 });
+      }
+      return Response.json(records.get(url.pathname));
+    },
+  });
+  const base = {
+    workflow: "recoverable",
+    version: "1",
+    input: {},
+    state: {},
+    checkpoints: [],
+    childRunIds: [],
+    startedAt: 1,
+    approvedApprovalIds: [],
+  };
+  await stores.workflowStore.save({ ...base, id: "running", status: "running" });
+  await stores.workflowStore.save({ ...base, id: "waiting", status: "waiting_approval" });
+
+  expect((await stores.workflowStore.listRecoverable?.())?.map((run) => run.id)).toEqual(["running"]);
+  await stores.close();
+});

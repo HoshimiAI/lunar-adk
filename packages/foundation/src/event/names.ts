@@ -19,6 +19,8 @@ export const EVENT_NAMES = [
   "memory.failed",
   "plugin.registered",
   "plugin.enabled",
+  "plugin.disabled",
+  "plugin.failed",
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];

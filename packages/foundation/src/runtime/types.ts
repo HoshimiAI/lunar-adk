@@ -3,11 +3,11 @@ import type { Run } from "../run";
 import type { Session, SessionStore } from "../session";
 import type { EventName, EventHandler } from "../event";
 import type { LunarEvent } from "../event";
-import type { Plugin } from "../plugin";
+import type { Plugin, PluginInfo } from "../plugin";
 import type { RunStore } from "../run";
 import type { Workflow, WorkflowRun, WorkflowStore, WorkflowRunOptions } from "../workflow";
 import type { ObservabilityConfig } from "../observability";
-import type { MemoryProvider } from "../memory";
+import type { EmbeddingProvider, MemoryProvider } from "../memory";
 import type { StorageBundle } from "../storage";
 
 export interface SteeringResult {
@@ -20,6 +20,7 @@ export interface SteeringResult {
 export interface RuntimeConfig {
   plugins?: Plugin[];
   memory?: MemoryProvider | MemoryProvider[];
+  embedding?: EmbeddingProvider;
   ownsMemory?: boolean;
   runStore?: RunStore;
   sessionStore?: SessionStore;
@@ -41,10 +42,12 @@ export interface RuntimeHandle {
   getStoredRun(runId: string): Promise<Run | undefined>;
   getSession(sessionId: string): Promise<Session | undefined>;
   getMemoryProvider(id?: string): MemoryProvider | undefined;
+  listPlugins(): readonly PluginInfo[];
   on(event: EventName, handler: EventHandler): () => void;
   registerAgent(agent: Agent): void;
   registerWorkflow(workflow: Workflow): void;
   runWorkflow(name: string, input?: unknown, options?: WorkflowRunOptions): Promise<WorkflowRun>;
+  recoverWorkflows(): Promise<WorkflowRun[]>;
   getWorkflowRun(id: string): Promise<WorkflowRun | undefined>;
   resumeWorkflow(id: string, approvalId?: string): Promise<WorkflowRun>;
   cancelWorkflow(id: string): Promise<WorkflowRun | undefined>;

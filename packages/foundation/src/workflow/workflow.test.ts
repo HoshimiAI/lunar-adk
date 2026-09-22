@@ -75,3 +75,62 @@ test("resumes a failed workflow from its latest checkpoint", async () => {
   expect(resumed.status).toBe("completed");
   expect(resumed.output).toBe("recovered");
 });
+
+test("recovers persisted running workflows from their latest checkpoint", async () => {
+  const store = new InMemoryWorkflowStore();
+  await store.save({
+    id: "running-workflow",
+    workflow: "restartable",
+    version: "1",
+    status: "running",
+    input: { request: "continue" },
+    state: { phase: "saved" },
+    checkpoints: [{ name: "phase-one", state: { phase: "saved" }, createdAt: 1 }],
+    childRunIds: [],
+    startedAt: 1,
+    approvedApprovalIds: [],
+  });
+  await store.save({
+    id: "waiting-workflow",
+    workflow: "restartable",
+    version: "1",
+    status: "waiting_approval",
+    input: {},
+    state: {},
+    checkpoints: [],
+    childRunIds: [],
+    startedAt: 1,
+    approvedApprovalIds: [],
+  });
+  const runtime = await createRuntime({ workflowStore: store });
+  runtime.registerWorkflow(defineWorkflow({
+    name: "restartable",
+    run: async (ctx) => {
+      expect(ctx.resumeFrom?.name).toBe("phase-one");
+      expect(ctx.state).toEqual({ phase: "saved" });
+      return ctx.input;
+    },
+  }));
+
+  const recovered = await runtime.recoverWorkflows();
+
+  expect(recovered).toHaveLength(1);
+  expect(recovered[0]).toMatchObject({
+    id: "running-workflow",
+    status: "completed",
+    output: { request: "continue" },
+  });
+  expect((await runtime.getWorkflowRun("waiting-workflow"))?.status).toBe("waiting_approval");
+  expect(await runtime.recoverWorkflows()).toEqual([]);
+});
+
+test("requires recoverable-workflow listing support from custom stores", async () => {
+  const runtime = await createRuntime({
+    workflowStore: {
+      async save(run) { return run; },
+      async get() { return undefined; },
+    },
+  });
+
+  await expect(runtime.recoverWorkflows()).rejects.toThrow("Workflow store does not support recovery listing");
+});

@@ -1,0 +1,97 @@
+---
+title: Subagents
+description: Delegate workflow work to managed child agents
+---
+
+Use `ctx.runSubAgent()` inside a code-first workflow to delegate a focused task
+to a registered agent. Lunar records the delegated execution as a child run of
+the workflow run, forwards workflow cancellation, and saves its ID in
+`WorkflowRun.childRunIds`.
+
+## Delegate work
+
+Register each specialist before registering the workflow, then call it by name:
+
+```ts
+import { createRuntime, defineAgent, defineWorkflow } from '@lunar/adk';
+
+const runtime = await createRuntime();
+
+runtime.registerAgent(defineAgent({
+  name: 'researcher',
+  model,
+  systemPrompt: 'Extract only the facts relevant to the question.',
+}));
+
+runtime.registerAgent(defineAgent({
+  name: 'writer',
+  model,
+  systemPrompt: 'Turn supplied research into a concise answer.',
+}));
+
+runtime.registerWorkflow(defineWorkflow({
+  name: 'answer-question',
+  run: async (ctx) => {
+    const research = await ctx.runSubAgent(
+      'researcher',
+      `Research: ${JSON.stringify(ctx.input)}`,
+    );
+    const answer = await ctx.runSubAgent('writer', research.output);
+
+    await ctx.checkpoint('drafted', { answer: answer.output });
+    return { answer: answer.output };
+  },
+}));
+```
+
+`runSubAgent()` returns the normal `AgentRunResult`, including `output` and the
+persisted child `run`. It accepts either a registered agent name or an `Agent`
+object, plus an optional `{ sessionId }`.
+
+## Ownership and sessions
+
+Every managed child run receives the workflow run ID as `parentRunId`. Lunar
+deduplicates and persists the child ID on the parent workflow run after the
+child completes. Retrieve the workflow with `getWorkflowRun()` and then load a
+child with `getStoredRun()`:
+
+```ts
+const workflowRun = await runtime.runWorkflow('answer-question', {
+  question: 'What is Bun?',
+});
+
+const child = await runtime.getStoredRun(workflowRun.childRunIds[0]!);
+console.log(child?.parentRunId === workflowRun.id); // true
+```
+
+Without `sessionId`, each child gets a new tenant-scoped session. Supply a
+session ID only when a child should continue an existing conversation. Child
+runs inherit the workflow tenant ID and cancellation signal.
+
+## Run independent children concurrently
+
+Use `ctx.parallel()` for independent tasks. It starts all supplied task
+functions together and resolves when every child completes.
+
+```ts
+run: async (ctx) => {
+  const [facts, risks] = await ctx.parallel([
+    () => ctx.runSubAgent('researcher', 'List the key facts.'),
+    () => ctx.runSubAgent('reviewer', 'List the important risks.'),
+  ]);
+
+  return { facts: facts.output, risks: risks.output };
+}
+```
+
+Use sequential calls when a later agent depends on an earlier output. A failed
+or cancelled child causes the workflow to fail or cancel unless the workflow
+runner handles that error itself.
+
+## Workflow boundaries
+
+Managed subagents are a workflow feature. The lower-level
+`runSubAgent(agent, input, options?)` helper from `@lunar/foundation/agent`
+simply invokes an `Agent`; it does not automatically create workflow ownership
+or append a child ID. Prefer `ctx.runSubAgent()` whenever the delegation is
+part of a workflow.

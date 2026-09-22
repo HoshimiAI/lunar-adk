@@ -83,8 +83,10 @@ Package: `@lunar/foundation/run`
 - `forkRun(run)` creates a continuation copy with a new ID.
 - `compareRuns(a, b)` compares two run results and usage values.
 - `InMemoryRunStore` stores runs in memory.
-- `startSpan(name, metadata?)` and `endSpan(span)` manage trace spans through
-  `@lunar/foundation/run` trace exports.
+- `Artifact` and `ArtifactStore` types describe application-managed artifacts.
+
+`startSpan(name, metadata?)` and `endSpan(span)` are internal trace helpers;
+they are not currently exported from a public Foundation subpath.
 
 ## Sessions
 
@@ -108,12 +110,33 @@ Packages: `@lunar/foundation/memory`, `@lunar/foundation/evaluation`
 - `normalize(score)` normalizes an evaluation score.
 - `EvaluatorRegistry` registers evaluators.
 
+## Auth, observability, and storage
+
+Packages: `@lunar/foundation/auth`, `@lunar/foundation/observability`, and
+`@lunar/foundation/storage`
+
+- `AuthPrincipal` identifies a subject, tenant, and permissions; implement
+  `AuthProvider.authenticate(request)` to integrate an application identity
+  system.
+- `ObservabilityHub` delivers event and run records to configured exporters.
+  `ObservabilityConfig` accepts exporters and the opt-in `captureContent` flag.
+- `StorageBundle` combines run, session, and workflow stores. Its capability
+  flags declare optimistic concurrency and atomic run/session writes.
+- `StorageConflictError` identifies a stale write with resource, ID, expected,
+  and actual revisions.
+- `verifyStorageBundle()` from `@lunar/foundation/storage/testing` validates a
+  custom storage bundle's contract.
+
 ## Plugins and events
 
 Package: `@lunar/foundation/plugin`
 
-- `definePlugin(plugin)` preserves a plugin definition.
-- `installPlugin(plugin, context)` installs a plugin and runs its lifecycle.
+- `definePlugin(plugin)` defines a versioned runtime extension bundle.
+- A plugin can register related tools, agents, workflows, memory providers,
+  evaluators, event handlers, commands, and schemas through `PluginContext`.
+- `register(context)` installs the bundle; optional `start(context)` runs after
+  registration; optional `stop(context)` runs during runtime shutdown.
+- `RuntimeHandle.listPlugins()` exposes installed plugin metadata and status.
 - `resolveOrder(plugins)` resolves plugin dependency order.
 - `assertPermission(granted, needed)` throws when a plugin lacks permission.
 - `PluginRegistry`, `CommandRegistry`, and `SchemaRegistry` manage registered
@@ -123,6 +146,13 @@ Package: `@lunar/foundation/event`
 
 - `EventBus` subscribes to and emits typed runtime events.
 - `EVENT_NAMES` contains the supported event names.
+
+The current names are `run.started`, `run.completed`, `run.failed`,
+`run.cancelled`, `model.called`, `agent.started`, `agent.completed`,
+`agent.failed`, `tool.started`, `tool.completed`, `tool.failed`,
+`tool.approval_required`, `workflow.started`, `workflow.completed`,
+`workflow.failed`, `memory.created`, `memory.retrieved`, `memory.failed`,
+`plugin.registered`, and `plugin.enabled`.
 
 ## Result helpers
 

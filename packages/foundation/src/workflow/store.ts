@@ -5,6 +5,7 @@ import { StorageConflictError } from "../storage/error";
 export interface WorkflowStore {
   save(run: WorkflowRun, options?: SaveOptions): Promise<WorkflowRun>;
   get(id: string): Promise<WorkflowRun | undefined>;
+  listRecoverable?(): Promise<WorkflowRun[]>;
 }
 
 export class InMemoryWorkflowStore implements WorkflowStore {
@@ -25,5 +26,9 @@ export class InMemoryWorkflowStore implements WorkflowStore {
 
   async get(id: string): Promise<WorkflowRun | undefined> {
     return this.runs.get(id);
+  }
+
+  async listRecoverable(): Promise<WorkflowRun[]> {
+    return [...this.runs.values()].filter((run) => run.status === "running");
   }
 }

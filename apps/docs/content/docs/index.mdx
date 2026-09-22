@@ -3,20 +3,22 @@ title: Overview
 description: Build reliable AI agents with Lunar ADK
 ---
 
-Lunar ADK is a Bun-first Agent Development Kit for TypeScript. It provides a
-provider-neutral runtime for composing agents, tools, workflows, sessions,
-memory, and durable runs.
+Lunar ADK is a Bun-first, provider-neutral TypeScript runtime for building AI
+agents. Applications compose models, agents, tools, workflows, sessions,
+durable runs, memory, observability, and optional external adapters behind
+stable contracts.
 
-## Packages
+## Start here
 
 <Cards>
-  <Card title="Get started" href="/docs/guides/getting-started" />
-  <Card title="Core concepts" href="/docs/core-concepts" />
-  <Card title="Guides" href="/docs/guides" />
+  <Card title="Build your first agent" href="/docs/guides/getting-started" />
+  <Card title="Features and packages" href="/docs/capabilities" />
+  <Card title="Implementation guides" href="/docs/guides" />
   <Card title="API reference" href="/docs/api-reference" />
   <Card title="Examples" href="/docs/examples" />
   <Card title="Elysia API example" href="https://github.com/HoshimiAI/lunar-adk/tree/main/apps/elysia" />
 </Cards>
 
-Start with the [introduction](/docs/introduction), then follow the
-[quick start](/docs/quick-start) to create a runtime.
+Use `@lunar/adk` for application code. Use `@lunar/foundation` subpaths for
+advanced integrations, then add only the model, storage, memory, auth, or
+telemetry adapter packages your deployment needs.

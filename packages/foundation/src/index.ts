@@ -37,7 +37,7 @@ export type {
 export { InMemoryWorkflowStore, WorkflowApprovalRequired } from "./workflow";
 
 export { createMemory, createInMemoryProvider, MemoryRegistry } from "./memory";
-export type { MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery, MemoryListQuery, MemoryPage } from "./memory";
+export type { EmbeddingProvider, MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery, MemoryListQuery, MemoryPage } from "./memory";
 
 export type { Run, RunStatus, PendingApproval, RunContinuation } from "./run";
 export { InMemoryRunStore } from "./run";

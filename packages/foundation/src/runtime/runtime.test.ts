@@ -59,6 +59,32 @@ test("runs workflows registered by plugins", async () => {
   expect(result.output).toBe("registered");
 });
 
+test("manages plugin lifecycle and exposes installed plugin metadata", async () => {
+  const calls: string[] = [];
+  const runtime = await createRuntime({
+    plugins: [{
+      id: "support-bundle",
+      version: "1.0.0",
+      description: "Customer support tools and workflows",
+      register() { calls.push("register"); },
+      start() { calls.push("start"); },
+      stop() { calls.push("stop"); },
+    }],
+  });
+
+  expect(calls).toEqual(["register", "start"]);
+  expect(runtime.listPlugins()).toEqual([{
+    id: "support-bundle",
+    version: "1.0.0",
+    description: "Customer support tools and workflows",
+    status: "enabled",
+  }]);
+
+  await runtime.shutdown?.();
+  expect(calls).toEqual(["register", "start", "stop"]);
+  expect(runtime.listPlugins()[0]?.status).toBe("disabled");
+});
+
 test("rejects stale run revisions", async () => {
   const store = new InMemoryRunStore();
   const first = await store.save({ id: "run-1", status: "pending", startedAt: 1, events: [], trace: [], artifacts: [], usage: { inputTokens: 0, outputTokens: 0 } });
@@ -90,6 +116,23 @@ test("retrieves and stores opt-in agent memory", async () => {
 
   expect((await provider.retrieve({ text: "Assistant: done", namespace: "preferences" }))).toHaveLength(1);
   expect(runtime.getMemoryProvider(provider.id)).toBe(provider);
+});
+
+test("retrieves embedded memory semantically when an embedding provider is configured", async () => {
+  const provider = createInMemoryProvider();
+  const embedding = { id: "test-embedding", async embed(input: string) { return input.includes("weather") ? [1, 0] : [0, 1]; } };
+  await provider.store({ content: "The forecast is sunny", tenantId: "tenant-a", embedding: [1, 0] });
+  let receivedHistory = "";
+  const runtime = await createRuntime({ memory: provider, embedding });
+  runtime.registerAgent(defineAgent({
+    name: "assistant",
+    memory: true,
+    model: { id: "model", capabilities: {}, async call({ messages }) { receivedHistory = messages.map((message) => message.content).join("\n"); return { text: "ok", toolCalls: [] }; } },
+  }));
+
+  await runtime.run("assistant", "What is the weather?", { tenantId: "tenant-a" });
+
+  expect(receivedHistory).toContain("The forecast is sunny");
 });
 
 test("rejects duplicate memory provider IDs", () => {
