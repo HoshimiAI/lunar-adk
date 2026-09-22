@@ -1,0 +1,12 @@
+---
+title: Error Handling
+description: Understand runtime and HTTP error behavior
+---
+
+Runs persist terminal failures so callers can inspect their status. Storage
+uses optimistic concurrency and rejects stale writes with
+`StorageConflictError`. Optional memory retrieval and storage failures emit
+`memory.failed` without failing an agent run.
+
+For Elysia response status codes and error bodies, see the
+[HTTP API reference](/docs/reference/http-api#errors).

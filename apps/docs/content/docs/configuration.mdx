@@ -1,0 +1,17 @@
+---
+title: Configuration
+description: Configure the Elysia example service
+---
+
+The Elysia example requires `OPENAI_API_KEY`. `OPENAI_MODEL` defaults to
+`gpt-5-mini`, and `PORT` defaults to `3000`.
+
+Storage defaults to local SQLite at `lunar.db`. Set `STORAGE_PROVIDER` to
+`http`, `postgres`, or `mysql` to select another adapter. HTTP storage requires
+`STORAGE_HTTP_BASE_URL` and optionally accepts `STORAGE_HTTP_TOKEN`. PostgreSQL
+and MySQL require `DATABASE_URL`.
+
+Set `LUNAR_TELEMETRY=console` for console telemetry. Set
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) for
+OTLP traces; `OTEL_SERVICE_NAME` defaults to `lunar-elysia`. Content capture is
+disabled unless `LUNAR_TELEMETRY_CAPTURE_CONTENT=true`.

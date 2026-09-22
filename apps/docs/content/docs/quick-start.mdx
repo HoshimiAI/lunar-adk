@@ -1,0 +1,21 @@
+---
+title: Quick Start
+description: Create and register an agent
+---
+
+```ts
+import { createRuntime, defineAgent } from '@lunar/adk';
+import { createOpenAIModelProvider } from '@lunar/provider-openai';
+
+const runtime = await createRuntime();
+runtime.registerAgent(defineAgent({
+  name: 'assistant',
+  model: createOpenAIModelProvider({
+    model: process.env.OPENAI_MODEL ?? 'gpt-5-mini',
+    apiKey: process.env.OPENAI_API_KEY,
+  }),
+}));
+```
+
+Keep `OPENAI_API_KEY` in the environment, not in source control. Continue with
+[agents and tools](/docs/guides/agents-and-tools) to run the agent.

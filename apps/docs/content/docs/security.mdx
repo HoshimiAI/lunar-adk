@@ -1,0 +1,11 @@
+---
+title: Security
+description: Protect credentials and telemetry content
+---
+
+Keep provider keys and storage tokens in environment variables or a secret
+manager; do not commit them to source control. The Elysia example reads
+`OPENAI_API_KEY` and optional HTTP storage tokens from the environment.
+
+Telemetry content capture is opt-in. Review the data sent to external model,
+storage, and telemetry providers before enabling it in production.

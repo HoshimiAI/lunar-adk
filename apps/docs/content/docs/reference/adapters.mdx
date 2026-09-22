@@ -80,8 +80,10 @@ Creates the same storage bundle using Bun.SQL. Supported dialects are
 Package: `@lunar/storage-mongo`
 
 Accepts an application-provided Mongo database object and maps runs, sessions,
-and workflow runs to collections using `replaceOne(..., { upsert: true })`.
-The package intentionally does not own a MongoDB SDK dependency.
+and workflow runs to collections. Its custom collection contract uses
+`insertOne()` for create-only writes and revision-filtered
+`replaceOne(..., { upsert: false })` for updates. The package intentionally
+does not own a MongoDB SDK dependency.
 
 All storage adapters implement revision-aware saves. HTTP adapters send the
 expected revision as `If-Match` and create-only writes as `If-None-Match: *`;

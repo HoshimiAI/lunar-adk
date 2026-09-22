@@ -1,0 +1,12 @@
+---
+title: Observability
+description: Export structured runtime telemetry
+---
+
+`@lunar/observability-otel` provides console and OTLP exporters. Pass them to
+`createRuntime({ observability: { exporters } })`. Telemetry records metadata
+by default; enable content capture explicitly only when appropriate for your
+data handling requirements.
+
+See [adapter reference](/docs/reference/adapters#lunarobservability-otel) for
+the exported factories and Elysia configuration variables.

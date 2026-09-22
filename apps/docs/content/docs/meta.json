@@ -1,8 +1,29 @@
 {
   "pages": [
     "index",
+    "introduction",
+    "getting-started",
+    "installation",
+    "quick-start",
+    "core-concepts",
+    "architecture",
     "guides",
-    "reference",
-    "use-cases"
+    "api-reference",
+    "sdk-reference",
+    "cli-reference",
+    "configuration",
+    "integrations",
+    "examples",
+    "error-handling",
+    "observability",
+    "security",
+    "deployment",
+    "performance",
+    "best-practices",
+    "migration-guide",
+    "changelog",
+    "contributing",
+    "faq",
+    "troubleshooting"
   ]
 }
