@@ -57,3 +57,28 @@ quotas at a shared gateway. Store failures return `503` rather than bypassing
 the quota. When auth is not configured, all requests share one anonymous
 quota bucket. Limits count HTTP requests equally; they are not token or cost
 budgets.
+
+## Runtime policy rules
+
+Pass ordered `policyRules` to `createRuntime()` to allow or deny named agent
+runs, workflow runs, and tool execution. The first matching rule wins; a rule
+without `name` matches every target for its action, and unmatched actions are
+allowed. Denied work fails with `POLICY_DENIED` before the model, workflow, or
+tool body runs.
+
+Plugins can add rules through `context.policies.register(rule)` during runtime
+bootstrap. Application `policyRules` are evaluated first; plugin rules follow
+plugin dependency order.
+
+```ts
+const runtime = await createRuntime({
+  policyRules: [
+    { id: "block-shell", effect: "deny", action: "tool.execute", name: "shell" },
+    { id: "allow-tools", effect: "allow", action: "tool.execute" },
+  ],
+});
+```
+
+Rules apply to `RuntimeHandle` methods, including streams, workflow recovery,
+workflow sub-agents, and resumed actions. They do not apply when calling an
+`Agent` instance directly.

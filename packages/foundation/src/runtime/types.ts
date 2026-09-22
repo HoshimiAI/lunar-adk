@@ -9,6 +9,7 @@ import type { Workflow, WorkflowRun, WorkflowStore, WorkflowRunOptions } from ".
 import type { ObservabilityConfig } from "../observability";
 import type { EmbeddingProvider, MemoryProvider } from "../memory";
 import type { StorageBundle } from "../storage";
+import type { PolicyRule } from "../policy";
 
 export interface SteeringResult {
   status: "accepted";
@@ -18,6 +19,8 @@ export interface SteeringResult {
 }
 
 export interface RuntimeConfig {
+  /** Ordered, first-match-wins rules for runtime agent, workflow, and tool execution. */
+  policyRules?: PolicyRule[];
   plugins?: Plugin[];
   memory?: MemoryProvider | MemoryProvider[];
   embedding?: EmbeddingProvider;

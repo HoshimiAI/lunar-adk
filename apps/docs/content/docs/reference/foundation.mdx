@@ -133,7 +133,8 @@ Package: `@lunar/foundation/plugin`
 
 - `definePlugin(plugin)` defines a versioned runtime extension bundle.
 - A plugin can register related tools, agents, workflows, memory providers,
-  evaluators, event handlers, commands, and schemas through `PluginContext`.
+  evaluators, event handlers, commands, schemas, and policy rules through
+  `PluginContext`.
 - `register(context)` installs the bundle; optional `start(context)` runs after
   registration; optional `stop(context)` runs during runtime shutdown.
 - `RuntimeHandle.listPlugins()` exposes installed plugin metadata and status.

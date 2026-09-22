@@ -21,7 +21,7 @@ async function createTestApp() {
 }
 
 describe("Elysia app", () => {
-  test("exposes installed plugin bundles and runs their workflows", async () => {
+test("exposes installed plugin bundles and runs their workflows", async () => {
     const runtime = await createRuntime({
       plugins: [definePlugin({
         id: "greeting",
@@ -257,6 +257,59 @@ describe("Elysia app", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ name: "lunar-elysia", status: "ok" });
+  });
+
+  test("returns token usage and throughput for completed runs", async () => {
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({
+      name: "assistant",
+      model: {
+        id: "metered-model",
+        capabilities: {},
+        async call() {
+          await Bun.sleep(10);
+          return { text: "metered", toolCalls: [], usage: { inputTokens: 4, outputTokens: 6 } };
+        },
+      },
+    }));
+    const app = await createApp(runtime);
+
+    const response = await app.handle(new Request("http://localhost/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: "hello" }),
+    }));
+    const body = await response.json();
+    const stored = await app.handle(new Request(`http://localhost/runs/${body.runId}`));
+
+    expect(body.usage).toEqual({ inputTokens: 4, outputTokens: 6, totalTokens: 10 });
+    expect(body.metrics.durationMs).toBeGreaterThan(0);
+    expect(body.metrics.outputTokensPerSecond).toBeGreaterThan(0);
+    expect(body.metrics.modelOutputTokensPerSecond).toBeGreaterThan(0);
+    expect((await stored.json()).usage).toEqual(body.usage);
+  });
+
+  test("aggregates token usage for a session", async () => {
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({
+      name: "assistant",
+      model: { id: "metered-model", capabilities: {}, async call() { return { text: "metered", toolCalls: [], usage: { inputTokens: 4, outputTokens: 6 } }; } },
+    }));
+    const app = await createApp(runtime);
+    const request = (body: unknown) => app.handle(new Request("http://localhost/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }));
+
+    const first = await request({ input: "first" });
+    const { sessionId } = await first.json();
+    await request({ input: "second", sessionId });
+    const session = await app.handle(new Request(`http://localhost/sessions/${sessionId}`));
+    const body = await session.json();
+
+    expect(body.usage).toEqual({ inputTokens: 8, outputTokens: 12, totalTokens: 20 });
+    expect(body.metrics.completedRuns).toBe(2);
   });
 
   test("returns 501 when streaming is unsupported", async () => {
@@ -598,4 +651,21 @@ describe("Elysia app", () => {
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ error: "Invalid request" });
   });
+});
+
+test("returns 403 when a runtime policy denies an agent run", async () => {
+  const runtime = await createRuntime({
+    policyRules: [{ id: "maintenance", effect: "deny", action: "agent.run", name: "assistant" }],
+  });
+  runtime.registerAgent(defineAgent({ name: "assistant", model: testModel }));
+  const app = await createApp(runtime);
+
+  const response = await app.handle(new Request("http://localhost/run", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ input: "hello" }),
+  }));
+
+  expect(response.status).toBe(403);
+  expect((await response.json()).error).toContain('Policy rule "maintenance" denied agent.run for "assistant"');
 });

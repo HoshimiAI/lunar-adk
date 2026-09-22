@@ -3,6 +3,8 @@ export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult }
 export { definePlugin } from "@lunar/foundation/plugin";
 export type { Plugin, PluginContext, PluginInfo, PluginManifest, PluginPermissions, PluginStatus } from "@lunar/foundation/plugin";
 export type { AuthPrincipal, AuthProvider } from "@lunar/foundation/auth";
+export { PolicyDeniedError } from "@lunar/foundation/policy";
+export type { PolicyAction, PolicyRule } from "@lunar/foundation/policy";
 
 export { AgentRunError, defineAgent } from "@lunar/foundation/agent";
 export type {

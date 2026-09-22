@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { AgentRunError, StorageConflictError, createRuntime, defineAgent } from "@lunar/adk";
-import type { AuthPrincipal, AuthProvider, EmbeddingProvider, RuntimeHandle, RuntimeStreamEvent } from "@lunar/adk";
+import type { AuthPrincipal, AuthProvider, EmbeddingProvider, Run, RuntimeHandle, RuntimeStreamEvent, Session } from "@lunar/adk";
 import { createOpenAIEmbeddingProvider, createOpenAIModelProvider } from "@lunar/provider-openai";
 import { createSqliteStores } from "@lunar/storage-sqlite";
 import { createHttpStores } from "@lunar/storage-http";
@@ -12,6 +12,47 @@ import { elysiaTools } from "./tools";
 
 function encodeSse(event: string, data: unknown): Uint8Array {
   return new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+function runMetrics(run: Run) {
+  const durationMs = run.endedAt === undefined ? undefined : Math.max(0, run.endedAt - run.startedAt);
+  const modelDurationMs = run.trace
+    .filter((span) => span.kind === "model" && span.endedAt !== undefined)
+    .reduce((total, span) => total + Math.max(0, span.endedAt! - span.startedAt), 0);
+  const perSecond = (duration: number | undefined) => duration && duration > 0
+    ? run.usage.outputTokens / (duration / 1_000)
+    : undefined;
+  return {
+    usage: {
+      ...run.usage,
+      totalTokens: run.usage.inputTokens + run.usage.outputTokens,
+    },
+    metrics: {
+      ...(durationMs !== undefined ? { durationMs, outputTokensPerSecond: perSecond(durationMs) } : {}),
+      ...(modelDurationMs > 0 ? { modelDurationMs, modelOutputTokensPerSecond: perSecond(modelDurationMs) } : {}),
+    },
+  };
+}
+
+async function sessionUsage(session: Session, runtime: RuntimeHandle) {
+  const runIds = [...new Set(session.runIds ?? session.runs?.map((run) => run.id) ?? [])];
+  const runs = (await Promise.all(runIds.map((id) => runtime.getStoredRun(id))))
+    .filter((run): run is Run => run !== undefined && run.sessionId === session.id);
+  const inputTokens = runs.reduce((total, run) => total + run.usage.inputTokens, 0);
+  const outputTokens = runs.reduce((total, run) => total + run.usage.outputTokens, 0);
+  const durationMs = runs.reduce((total, run) => total + (run.endedAt === undefined ? 0 : Math.max(0, run.endedAt - run.startedAt)), 0);
+  const modelDurationMs = runs.reduce((total, run) => total + run.trace
+    .filter((span) => span.kind === "model" && span.endedAt !== undefined)
+    .reduce((modelTotal, span) => modelTotal + Math.max(0, span.endedAt! - span.startedAt), 0), 0);
+  const perSecond = (duration: number) => duration > 0 ? outputTokens / (duration / 1_000) : undefined;
+  return {
+    usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+    metrics: {
+      completedRuns: runs.filter((run) => run.endedAt !== undefined).length,
+      ...(durationMs > 0 ? { durationMs, outputTokensPerSecond: perSecond(durationMs) } : {}),
+      ...(modelDurationMs > 0 ? { modelDurationMs, modelOutputTokensPerSecond: perSecond(modelDurationMs) } : {}),
+    },
+  };
 }
 
 function toSse(event: RuntimeStreamEvent): { name: string; data: unknown } {
@@ -27,6 +68,7 @@ function toSse(event: RuntimeStreamEvent): { name: string; data: unknown } {
         sessionId: event.result.run.sessionId,
         status: event.result.run.status,
         pendingApproval: event.result.run.pendingApproval,
+        ...runMetrics(event.result.run),
       },
     };
   }
@@ -213,7 +255,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         return { error: "Invalid request", details: error.message };
       }
       if (error instanceof AgentRunError) {
-        set.status = error.code === "CANCELLED" ? 409 : 500;
+        set.status = error.code === "CANCELLED" ? 409 : error.code === "POLICY_DENIED" ? 403 : 500;
         return { error: error.message, runId: error.run.id };
       }
       if (error instanceof StorageConflictError) {
@@ -300,7 +342,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 404;
         return { error: "Run not found" };
       }
-      return run;
+      return { ...run, ...runMetrics(run) };
     })
     .get("/sessions/:id", async ({ params, set, principal }) => {
       const session = await runtime.getSession(params.id);
@@ -308,7 +350,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 404;
         return { error: "Session not found" };
       }
-      return session;
+      return { ...session, ...(await sessionUsage(session, runtime)) };
     })
     .post(
       "/workflows/:name/run",
@@ -468,6 +510,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
           sessionId: result.run.sessionId,
           status: result.run.status,
           pendingApproval: result.run.pendingApproval,
+          ...runMetrics(result.run),
         };
       },
       {

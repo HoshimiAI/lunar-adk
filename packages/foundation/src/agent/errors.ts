@@ -6,7 +6,8 @@ export type AgentErrorCode =
   | "MAX_TOOL_ROUNDS"
   | "EXECUTION_FAILED"
   | "APPROVAL_REQUIRED"
-  | "APPROVAL_REJECTED";
+  | "APPROVAL_REJECTED"
+  | "POLICY_DENIED";
 
 export class AgentRunError extends Error {
   constructor(

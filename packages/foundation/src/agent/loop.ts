@@ -18,6 +18,7 @@ import { AgentRunError } from "./errors";
 import { throwIfAborted } from "./cancellation";
 import type { AgentConfig, AgentRunOptions, AgentRunResult } from "./types";
 import { endSpan, startSpan } from "../run/trace";
+import { PolicyDeniedError } from "../policy";
 
 export async function runAgentLoop(
   config: AgentConfig,
@@ -72,6 +73,7 @@ export async function runAgentLoop(
   };
 
   try {
+    options.policy?.("agent.run", config.name);
     while (true) {
       captureInterruption();
       throwIfAborted(options.signal);
@@ -150,6 +152,7 @@ export async function runAgentLoop(
       const toolCall = toolCalls[nextToolIndex];
       if (!toolCall) continue;
       throwIfAborted(options.signal);
+      options.policy?.("tool.execute", toolCall.name);
       const tool = tools.get(toolCall.name);
       const toolSpan = startSpan(`tool.${toolCall.name}`, "tool", run.id, agentSpan.id, {
         "lunar.tool": toolCall.name,
@@ -210,7 +213,9 @@ export async function runAgentLoop(
       ? "STEERED"
       : cancelled
         ? "CANCELLED"
-      : message.includes("exceeded max tool roundtrips")
+        : error instanceof PolicyDeniedError
+          ? "POLICY_DENIED"
+        : message.includes("exceeded max tool roundtrips")
         ? "MAX_TOOL_ROUNDS"
         : "EXECUTION_FAILED";
     captureInterruption();

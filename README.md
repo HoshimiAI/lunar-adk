@@ -31,6 +31,11 @@ bun run typecheck
 bun test
 ```
 
+For the production-equivalent local gate, run `bun run ci`. It type-checks,
+runs the test suite with live-provider tests explicitly disabled, and audits
+dependencies. Live checks require an explicitly provided restricted API key:
+`bun run test:live`.
+
 ## Run the Elysia app
 
 ```bash

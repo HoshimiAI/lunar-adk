@@ -6,6 +6,7 @@ import { EventBus } from "../event";
 import { CommandRegistry, SchemaRegistry, installPlugin, resolveOrder, stopPlugin, type Plugin, type PluginContext } from "../plugin";
 import type { RuntimeConfig } from "./types";
 import type { Workflow } from "../workflow";
+import { validatePolicyRule, type PolicyRule } from "../policy";
 
 export interface Bootstrapped {
   agents: AgentRegistry;
@@ -14,12 +15,13 @@ export interface Bootstrapped {
   evaluators: EvaluatorRegistry;
   events: EventBus;
   workflows: Map<string, Workflow>;
+  policyRules: readonly PolicyRule[];
   plugins: Plugin[];
   shutdownPlugins(): Promise<void>;
 }
 
 export async function bootstrap(
-  config: Required<Pick<RuntimeConfig, "plugins">>,
+  config: Required<Pick<RuntimeConfig, "plugins" | "policyRules">>,
   memoryProvider?: RuntimeConfig["memory"],
 ): Promise<Bootstrapped> {
   const agents = new AgentRegistry();
@@ -32,6 +34,10 @@ export async function bootstrap(
   const evaluators = new EvaluatorRegistry();
   const events = new EventBus();
   const workflows = new Map<string, Workflow>();
+  const policyRules = config.policyRules.map((rule) => {
+    validatePolicyRule(rule);
+    return { ...rule };
+  });
 
   const ctx: PluginContext = {
     agents,
@@ -45,6 +51,12 @@ export async function bootstrap(
           ? { name: workflowOrId, version: "1", run: run! }
           : workflowOrId;
         workflows.set(workflow.name, workflow);
+      },
+    },
+    policies: {
+      register(rule) {
+        validatePolicyRule(rule);
+        policyRules.push({ ...rule });
       },
     },
     commands: new CommandRegistry(),
@@ -73,6 +85,7 @@ export async function bootstrap(
     evaluators,
     events,
     workflows,
+    policyRules,
     plugins: installedPlugins,
     async shutdownPlugins() {
       if (pluginsStopped) return;

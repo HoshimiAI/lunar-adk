@@ -3,9 +3,9 @@ title: "API: @lunar/adk"
 description: Stable application-facing Lunar ADK exports
 ---
 
-The stable facade re-exports the APIs most applications need, including memory
-and workflows. Plugin and evaluation APIs are intentionally experimental and
-are exported from `@lunar/adk/experimental` instead.
+The stable facade re-exports the APIs most applications need, including memory,
+workflows, and plugins. Evaluation APIs remain experimental and are exported
+from `@lunar/adk/experimental`.
 
 | Export | Purpose |
 | --- | --- |
@@ -15,6 +15,7 @@ are exported from `@lunar/adk/experimental` instead.
 | `defineModelProvider` | Mark a provider as a foundation model provider |
 | `createSession` | Create an empty session |
 | `defineWorkflow` | Create a resumable workflow |
+| `definePlugin` | Define a versioned runtime extension bundle |
 | `createMemory`, `createInMemoryProvider`, `MemoryRegistry` | Configure optional long-term memory |
 | `InMemoryRunStore`, `InMemorySessionStore`, `InMemoryWorkflowStore` | Development stores |
 | `AgentRunError`, `WorkflowApprovalRequired` | Execution and approval errors |
@@ -84,20 +85,32 @@ an `execute(input)` function.
 Accepts `name` and either an async `run(context)` function or a declarative
 `root` step tree. `version` defaults to `"1"`.
 
+## `definePlugin(plugin)`
+
+Defines a stable, versioned extension bundle. Plugins can register agents,
+tools, workflows, memory providers, evaluators, event handlers, commands, and
+schemas, and policy rules through `PluginContext`; optional `start()` and
+`stop()` hooks follow runtime lifecycle. Configure plugin bundles through
+`createRuntime({ plugins })` and inspect their status with
+`runtime.listPlugins()`. Plugin rules are appended after application
+`policyRules` in dependency order, so application rules take precedence.
+
 ## Common types
 
 The facade exports `Agent`, `AgentConfig`, `AgentRunOptions`, `AgentRunResult`,
-`Tool`, `ToolResult`, `ModelProvider`, `ModelResponse`, `ModelStreamPart`,
+`Tool`, `ToolResult`, `Plugin`, `PluginContext`, `PluginManifest`,
+`PluginPermissions`, `ModelProvider`, `ModelResponse`, `ModelStreamPart`,
 `Run`, `Session`, `Workflow`, `WorkflowRun`, and their related status and store
 types. See the concept guides for behavior and examples.
 
 ## `@lunar/adk/experimental`
 
-This subpath exposes the currently experimental extension surface:
+This subpath exposes the currently experimental evaluation surface:
 
-- `definePlugin` and the `Plugin`, `PluginContext`, `PluginManifest`, and
-  `PluginPermissions` types;
 - `defineEvaluator` and the `Evaluator` and `EvaluationScore` types;
+
+Plugin exports remain available from this subpath for source compatibility, but
+are deprecated. Import them from `@lunar/adk` instead.
 
 For all underlying helpers and subpath modules, use the
 [Foundation reference](/docs/reference/foundation).

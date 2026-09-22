@@ -1,6 +1,8 @@
 export { createRuntime } from "./runtime";
 export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "./runtime";
 export type { AuthPrincipal, AuthProvider } from "./auth";
+export { PolicyDeniedError } from "./policy";
+export type { PolicyAction, PolicyRule } from "./policy";
 
 export { AgentRunError, defineAgent } from "./agent";
 export type { Agent, AgentConfig, AgentMemoryConfig, AgentRunOptions, AgentRunResult, AgentErrorCode } from "./agent";

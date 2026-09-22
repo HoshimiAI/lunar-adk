@@ -12,6 +12,7 @@ import type { Workflow, WorkflowContext, WorkflowRun } from "../workflow";
 import type { RunContinuation } from "../run";
 import { WorkflowApprovalRequired } from "../workflow";
 import { ObservabilityHub } from "../observability";
+import { createPolicyEnforcer } from "../policy";
 
 export type { RuntimeConfig, RuntimeHandle, SteeringResult } from "./types";
 export type { RuntimeStreamEvent } from "./types";
@@ -76,7 +77,8 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   if (storage?.capabilities?.atomicRunSession && !storage.saveRunAndSession) {
     throw new Error("Storage declares atomic run/session support without implementing saveRunAndSession");
   }
-  const bootstrapped = await bootstrap(resolved, config.memory);
+  const bootstrapped = await bootstrap({ plugins: resolved.plugins, policyRules: config.policyRules ?? [] }, config.memory);
+  const enforcePolicy = createPolicyEnforcer(bootstrapped.policyRules);
   const { agents, events, memory, workflows } = bootstrapped;
   let pluginStatus: "enabled" | "disabled" = "enabled";
   const defaultMemoryProviderId = configuredMemoryProviders[0]?.id ?? "in-memory";
@@ -198,6 +200,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     };
     const promise = agent.run(input, {
       ...options,
+      policy: enforcePolicy,
       sessionId: session.id,
       history: options.continuation ? options.history : [...memoryHistory, ...session.history],
       signal: controller.signal,
@@ -329,6 +332,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
 
     const promise = (async () => {
       try {
+        enforcePolicy("workflow.run", workflow.name);
         const output = await workflow.run(context);
         run.output = output;
         run.status = "completed";

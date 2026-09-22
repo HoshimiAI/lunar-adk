@@ -3,8 +3,46 @@ title: Deployment
 description: Deployment guidance for Lunar ADK services
 ---
 
-## Coming soon
+Lunar services are stateless at the HTTP layer. Use durable storage for runs,
+sessions, and workflows before running more than one replica.
 
-Deployment guidance is not yet available. The Elysia example can use SQLite,
-remote SQL, or HTTP storage; see [configuration](/docs/configuration) for its
-supported environment variables.
+## Production configuration
+
+Start from `apps/elysia/.env.production.example` and place its values in the
+deployment platform's secret/config store. Never commit a real `.env` file.
+Set `STORAGE_PROVIDER=postgres` or `mysql` with `DATABASE_URL` for a shared SQL
+store. Local SQLite is appropriate for development or a deliberately
+single-instance deployment with persistent disk.
+
+Configure an OTLP endpoint and leave `LUNAR_TELEMETRY_CAPTURE_CONTENT=false`
+unless retention, access, and redaction controls have been reviewed.
+
+## Scaling and safety
+
+- Run at least two replicas only after configuring shared durable storage.
+- The default rate-limit store is in-process and resets on restart. For more
+  than one replica, pass a shared atomic `RateLimitStore` to `createApp()` or
+  enforce quotas at a gateway.
+- Configure platform request timeouts, concurrency limits, and maximum request
+  body sizes. Lunar's rate limit is a request quota, not a spend or token cap.
+- Treat policy rules as deployment configuration. Review and test changes before
+  rollout; denied actions are persisted with `POLICY_DENIED`.
+
+## Rollout and recovery
+
+1. Run `bun run ci` and the opt-in real-provider checks in an isolated release
+   environment.
+2. Deploy one canary replica with health checks on `/health` and readiness
+   checks on `/readyz`; confirm telemetry, storage, and rate limiting work.
+3. Roll out remaining replicas, then monitor failed runs, workflow failures,
+   rate-limit rejections, and exporter errors.
+4. Roll back the application version if error rates rise. Persisted workflows
+   can be recovered after the prior compatible version is restored.
+
+## Release gate
+
+CI intentionally runs `bun run test:ci`, which forces `RUN_LIVE_TESTS=0` even
+if credentials are available. Before a production release, an operator runs
+`bun run test:live` with a restricted provider key in a dedicated environment.
+Tag releases as `vX.Y.Z`; the release workflow verifies the tag matches the
+shared version of every publishable `@lunar/*` package.

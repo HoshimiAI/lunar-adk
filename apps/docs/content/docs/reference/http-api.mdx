@@ -38,8 +38,12 @@ All JSON requests use `content-type: application/json`. Input strings must be
 { "input": "Explain why Bun is useful", "sessionId": "optional-session-id" }
 ```
 
-Returns `{ output, runId, sessionId, status, pendingApproval }`. Use the
-returned session ID to continue a conversation.
+Returns `{ output, runId, sessionId, status, pendingApproval, usage, metrics }`.
+`usage` contains `inputTokens`, `outputTokens`, and `totalTokens`. `metrics`
+contains whole-run `durationMs` and `outputTokensPerSecond`; when model trace
+timing is available, it also includes `modelDurationMs` and
+`modelOutputTokensPerSecond`, excluding tool and workflow time. Use the returned
+session ID to continue a conversation.
 
 ## Stream an assistant
 
@@ -48,7 +52,8 @@ SSE event names are:
 
 - runtime lifecycle event names such as `run.started` and `tool.completed`;
 - `text.delta` with `{ runId, text }`;
-- `stream.completed` with output, run, session, status, and approval data;
+- `stream.completed` with output, run, session, status, approval, usage, and
+  throughput metric data;
 - `stream.interrupted` with continuation IDs;
 - `stream.error` with `error`, and optional `runId` and `code`.
 
@@ -59,7 +64,7 @@ model cannot stream.
 
 | Method | Route | Result |
 | --- | --- | --- |
-| `GET` | `/runs/:id` | Stored run; `404` if absent |
+| `GET` | `/runs/:id` | Stored run plus calculated `usage` and `metrics`; `404` if absent |
 | `POST` | `/runs/:id/cancel` | Cancelled run; `404` if absent |
 | `POST` | `/runs/:id/approve` | `{ runId, status, output, pendingApproval }` |
 | `POST` | `/runs/:id/reject` | Updated run |
@@ -69,7 +74,10 @@ approvals return `409`.
 
 ## Sessions and steering
 
-`GET /sessions/:id` returns the session or `404`.
+`GET /sessions/:id` returns the session plus aggregate `usage` and `metrics`
+for its persisted runs, or `404`. Session totals include `inputTokens`,
+`outputTokens`, and `totalTokens`; its throughput values use the summed runtime
+and model durations of completed runs rather than idle time between turns.
 
 `POST /sessions/:id/steer` accepts `{ "instruction": "..." }`. It returns
 `{ sessionId, steered: true }` when no run is active, or `202` with

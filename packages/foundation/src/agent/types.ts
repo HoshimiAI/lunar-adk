@@ -6,6 +6,7 @@ import type { EventBus } from "../event";
 import type { Run, RunContinuation } from "../run";
 import type { LunarEvent } from "../event";
 import type { MemoryProvider } from "../memory";
+import type { PolicyEnforcer } from "../policy";
 
 export type AgentState = "idle" | "running" | "waiting" | "done" | "error";
 
@@ -46,6 +47,8 @@ export interface AgentRunOptions {
   onInterrupted?: (continuation: RunContinuation) => void;
   onSteered?: (event: { interruptedRunId: string; continuationRunId: string; sessionId: string }) => void;
   memoryProvider?: MemoryProvider;
+  /** Internal runtime policy hook applied before agent and tool execution. */
+  policy?: PolicyEnforcer;
 }
 
 export interface AgentRunResult {
