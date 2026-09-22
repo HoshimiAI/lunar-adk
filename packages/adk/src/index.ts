@@ -40,16 +40,18 @@ export { StorageConflictError } from "@lunar/foundation/storage";
 export type { StorageBundle, StorageCapabilities, SaveOptions } from "@lunar/foundation/storage";
 
 export { createMemory, createInMemoryProvider, MemoryRegistry } from "@lunar/foundation/memory";
-export type { MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery, MemoryListQuery, MemoryPage } from "@lunar/foundation/memory";
+export type { EmbeddingProvider, MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery, MemoryListQuery, MemoryPage } from "@lunar/foundation/memory";
 
 export { defineWorkflow, InMemoryWorkflowStore, WorkflowApprovalRequired } from "@lunar/foundation/workflow";
 export type {
   Workflow,
   WorkflowConfig,
+  WorkflowStep,
   WorkflowContext,
   WorkflowRun,
   WorkflowStatus,
   WorkflowCheckpoint,
   WorkflowApproval,
   WorkflowStore,
+  ApprovalHandler,
 } from "@lunar/foundation/workflow";
