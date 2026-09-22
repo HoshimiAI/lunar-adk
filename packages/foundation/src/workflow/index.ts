@@ -19,6 +19,7 @@ export type {
   WorkflowCheckpoint,
   WorkflowApproval,
   WorkflowRuntimeConfig,
+  WorkflowRunOptions,
 } from "./types";
 export { WorkflowApprovalRequired } from "./types";
 

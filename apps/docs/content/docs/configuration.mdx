@@ -15,3 +15,11 @@ Set `LUNAR_TELEMETRY=console` for console telemetry. Set
 `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) for
 OTLP traces; `OTEL_SERVICE_NAME` defaults to `lunar-elysia`. Content capture is
 disabled unless `LUNAR_TELEMETRY_CAPTURE_CONTENT=true`.
+
+## Production memory
+
+Set `MEMORY_PROVIDER=postgres` to enable curated PostgreSQL memory. It uses
+`MEMORY_DATABASE_URL`, falling back to `DATABASE_URL`; `MEMORY_NAMESPACE`
+defaults to `assistant`, and `MEMORY_RETRIEVE_LIMIT` defaults to `5`.
+Production memory retrieval is read-only for the example agent. Operators add
+facts through the authenticated memory API with an explicit expiry time.

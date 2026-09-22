@@ -1,0 +1,8 @@
+{
+  "name": "@lunar/memory-bun-sql",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "bun test", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@lunar/foundation": "workspace:*" }
+}

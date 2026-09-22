@@ -15,6 +15,9 @@
     "@lunar/storage-sqlite": "workspace:*",
     "@lunar/storage-http": "workspace:*",
     "@lunar/storage-bun-sql": "workspace:*",
+    "@lunar/memory-bun-sql": "workspace:*",
+    "@lunar/auth-better-auth": "workspace:*",
+    "better-auth": "^1.6.0",
     "@lunar/observability-otel": "workspace:*",
     "elysia": "latest"
   }

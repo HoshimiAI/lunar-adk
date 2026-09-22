@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added tenant-aware runtime records, authenticated Elysia composition, and a Better Auth adapter contract.
+- Added PostgreSQL full-text curated memory with expiry and permission-protected management routes.
+- Added atomic PostgreSQL run/session persistence through the Bun.SQL storage bundle.
+
 - Added opt-in agent memory retrieval and conversation storage.
 - Added namespaces, metadata filters, deletion, lifecycle ownership, and duplicate-ID protection for memory providers.
 - Made adapter revision checks atomic and added a reusable storage conformance verifier.

@@ -5,7 +5,7 @@ import type { EventName, EventHandler } from "../event";
 import type { LunarEvent } from "../event";
 import type { Plugin } from "../plugin";
 import type { RunStore } from "../run";
-import type { Workflow, WorkflowRun, WorkflowStore } from "../workflow";
+import type { Workflow, WorkflowRun, WorkflowStore, WorkflowRunOptions } from "../workflow";
 import type { ObservabilityConfig } from "../observability";
 import type { MemoryProvider } from "../memory";
 import type { StorageBundle } from "../storage";
@@ -44,7 +44,7 @@ export interface RuntimeHandle {
   on(event: EventName, handler: EventHandler): () => void;
   registerAgent(agent: Agent): void;
   registerWorkflow(workflow: Workflow): void;
-  runWorkflow(name: string, input?: unknown): Promise<WorkflowRun>;
+  runWorkflow(name: string, input?: unknown, options?: WorkflowRunOptions): Promise<WorkflowRun>;
   getWorkflowRun(id: string): Promise<WorkflowRun | undefined>;
   resumeWorkflow(id: string, approvalId?: string): Promise<WorkflowRun>;
   cancelWorkflow(id: string): Promise<WorkflowRun | undefined>;

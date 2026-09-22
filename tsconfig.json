@@ -7,6 +7,8 @@
     { "path": "packages/provider-openai" },
     { "path": "packages/storage-sqlite" },
     { "path": "packages/memory-sqlite" },
+    { "path": "packages/memory-bun-sql" },
+    { "path": "packages/auth-better-auth" },
     { "path": "packages/observability-otel" },
     { "path": "packages/storage-http" },
     { "path": "packages/storage-bun-sql" },

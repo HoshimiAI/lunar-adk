@@ -1,5 +1,6 @@
 export { createRuntime } from "./runtime";
 export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "./runtime";
+export type { AuthPrincipal, AuthProvider } from "./auth";
 
 export { AgentRunError, defineAgent } from "./agent";
 export type { Agent, AgentConfig, AgentMemoryConfig, AgentRunOptions, AgentRunResult, AgentErrorCode } from "./agent";
@@ -36,7 +37,7 @@ export type {
 export { InMemoryWorkflowStore, WorkflowApprovalRequired } from "./workflow";
 
 export { createMemory, createInMemoryProvider, MemoryRegistry } from "./memory";
-export type { MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery } from "./memory";
+export type { MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery, MemoryListQuery, MemoryPage } from "./memory";
 
 export type { Run, RunStatus, PendingApproval, RunContinuation } from "./run";
 export { InMemoryRunStore } from "./run";

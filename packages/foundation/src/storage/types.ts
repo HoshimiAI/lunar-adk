@@ -21,5 +21,6 @@ export interface StorageBundle {
   sessionStore: SessionStore;
   workflowStore: WorkflowStore;
   saveRunAndSession?(run: Run, session: Session, options?: SaveOptions): Promise<{ run: Run; session: Session }>;
+  health?(): Promise<void>;
   close?(): void | Promise<void>;
 }

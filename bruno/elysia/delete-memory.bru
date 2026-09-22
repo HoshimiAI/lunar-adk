@@ -1,11 +1,11 @@
 meta {
-  name: Cancel run
+  name: Delete curated memory
   type: http
-  seq: 6
+  seq: 22
 }
 
-post {
-  url: {{baseUrl}}/runs/{{runId}}/cancel
+delete {
+  url: {{baseUrl}}/memories/{{memoryId}}
   body: none
   auth: none
 }
@@ -16,4 +16,5 @@ headers {
 
 assert {
   res.status: eq 200
+  res.body.deleted: eq true
 }

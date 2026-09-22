@@ -18,6 +18,7 @@ export interface WorkflowApproval {
 export interface WorkflowRun {
   id: string;
   revision?: number;
+  tenantId?: string;
   workflow: string;
   version: string;
   status: WorkflowStatus;
@@ -31,6 +32,10 @@ export interface WorkflowRun {
   error?: string;
   pendingApproval?: WorkflowApproval;
   approvedApprovalIds: string[];
+}
+
+export interface WorkflowRunOptions {
+  tenantId?: string;
 }
 
 export interface WorkflowContext {

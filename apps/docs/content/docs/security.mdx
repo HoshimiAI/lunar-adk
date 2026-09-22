@@ -9,3 +9,19 @@ manager; do not commit them to source control. The Elysia example reads
 
 Telemetry content capture is opt-in. Review the data sent to external model,
 storage, and telemetry providers before enabling it in production.
+
+## Authentication and tenants
+
+For a multi-tenant service, pass an `AuthProvider` to `createApp()`. It must
+verify the incoming request and return a principal with a tenant ID and
+permissions. Lunar scopes runs, sessions, workflow runs, and memories to that
+tenant. Do not derive a tenant from an unverified request header.
+
+`@lunar/auth-better-auth` provides `createBetterAuthProvider()` for Better Auth
+sessions. The application maps a verified Better Auth user/session to Lunar's
+tenant and permission model. Curated memory endpoints require `memory:read`,
+`memory:write`, or `memory:delete` permissions.
+
+For Elysia, use `createAppWithBetterAuth(runtime, { betterAuth, mapPrincipal })`.
+It mounts Better Auth's `/api/auth` handler and protects Lunar routes with the
+same verified session.

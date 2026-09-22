@@ -88,6 +88,22 @@ MySQL, and MariaDB through Bun.SQL. For MongoDB, pass a database handle from
 the official MongoDB SDK to `createMongoStores()`. Unknown Planet can expose a
 separate SDK adapter in its own repository using `StorageBundle`.
 
+For production PostgreSQL memory, use `@lunar/memory-bun-sql`. It stores
+tenant-scoped curated facts with mandatory expiry and uses PostgreSQL full-text
+search. The provider requires `tenantId` for reads and writes.
+
+```ts
+import { createBunSqlMemoryProvider } from '@lunar/memory-bun-sql';
+
+const memory = await createBunSqlMemoryProvider({
+  connection: process.env.MEMORY_DATABASE_URL!,
+});
+```
+
+PostgreSQL storage supports atomic run/session writes; the Bun.SQL MySQL,
+HTTP, and MongoDB bundles preserve individual revision-safe writes but do not
+declare atomic run/session support.
+
 The adapter initializes its tables and schema version automatically. It stores
 records as JSON and supports the `get()` and `save()` methods required by the
 foundation store interfaces. Use `:memory:` for isolated tests.

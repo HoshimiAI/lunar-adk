@@ -1,11 +1,11 @@
 meta {
-  name: Cancel run
+  name: List curated memories
   type: http
-  seq: 6
+  seq: 21
 }
 
-post {
-  url: {{baseUrl}}/runs/{{runId}}/cancel
+get {
+  url: {{baseUrl}}/memories
   body: none
   auth: none
 }
@@ -16,4 +16,5 @@ headers {
 
 assert {
   res.status: eq 200
+  res.body.records: isArray
 }

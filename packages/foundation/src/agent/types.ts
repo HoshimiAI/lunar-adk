@@ -32,6 +32,7 @@ export interface AgentRunOptions {
   signal?: AbortSignal;
   history?: ModelMessage[];
   sessionId?: string;
+  tenantId?: string;
   eventBus?: EventBus;
   continuation?: RunContinuation;
   resumeRun?: Run<string>;

@@ -1,0 +1,9 @@
+{
+  "name": "@lunar/auth-better-auth",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "bun test", "typecheck": "tsc --noEmit" },
+  "peerDependencies": { "better-auth": ">=1.0.0" },
+  "dependencies": { "@lunar/foundation": "workspace:*" }
+}

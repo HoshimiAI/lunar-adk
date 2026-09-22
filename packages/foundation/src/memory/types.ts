@@ -3,6 +3,8 @@ export interface MemoryRecord {
   content: string;
   metadata?: Record<string, unknown>;
   namespace?: string;
+  tenantId?: string;
+  expiresAt?: number;
   score?: number;
   createdAt: number;
 }
@@ -13,6 +15,20 @@ export interface MemoryQuery {
   namespace?: string;
   filter?: Record<string, unknown>;
   minScore?: number;
+  tenantId?: string;
+}
+
+export interface MemoryListQuery {
+  tenantId?: string;
+  namespace?: string;
+  filter?: Record<string, unknown>;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface MemoryPage {
+  records: MemoryRecord[];
+  nextCursor?: string;
 }
 
 export interface MemoryCapabilities {
@@ -27,6 +43,7 @@ export interface MemoryProvider {
   readonly capabilities?: MemoryCapabilities;
   store(record: Omit<MemoryRecord, "id" | "createdAt">): Promise<MemoryRecord>;
   retrieve(query: MemoryQuery): Promise<MemoryRecord[]>;
-  delete?(id: string): Promise<boolean>;
+  list?(query: MemoryListQuery): Promise<MemoryPage>;
+  delete?(id: string, tenantId?: string): Promise<boolean>;
   close?(): void | Promise<void>;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createRuntime, defineAgent, defineTool, defineWorkflow } from "@lunar/adk";
 import type { ModelProvider } from "@lunar/adk";
-import { createApp } from "./app";
+import { createApp, createAppWithBetterAuth } from "./app";
 import { calculatorTool, currentTimeTool } from "./tools";
 
 const testModel: ModelProvider = {
@@ -21,6 +21,61 @@ async function createTestApp() {
 }
 
 describe("Elysia app", () => {
+  test("mounts Better Auth while protecting Lunar routes", async () => {
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model: testModel }));
+    const app = await createAppWithBetterAuth(runtime, {
+      betterAuth: {
+        handler: (request) => new Response(JSON.stringify({ path: new URL(request.url).pathname }), { headers: { "content-type": "application/json" } }),
+        api: { async getSession() { return { user: { id: "user" }, session: { id: "session" } }; } },
+      },
+      mapPrincipal: ({ user }) => ({ subjectId: user.id, tenantId: "tenant-a", permissions: [] }),
+    });
+    const login = await app.handle(new Request("http://localhost/api/auth/ok"));
+    expect(login.status).toBe(200);
+    const run = await app.handle(new Request("http://localhost/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: "hello" }) }));
+    expect(run.status).toBe(200);
+  });
+
+  test("requires a verified principal when auth is configured", async () => {
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model: testModel }));
+    const app = await createApp(runtime, {
+      auth: { async authenticate(request) { return request.headers.get("authorization") === "Bearer ok" ? { subjectId: "user", tenantId: "tenant-a", permissions: ["memory:read", "memory:write", "memory:delete"] } : undefined; } },
+    });
+    const unauthorized = await app.handle(new Request("http://localhost/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: "hello" }) }));
+    expect(unauthorized.status).toBe(401);
+    const authorized = await app.handle(new Request("http://localhost/run", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer ok" }, body: JSON.stringify({ input: "hello" }) }));
+    const body = await authorized.json();
+    const stored = await runtime.getStoredRun(body.runId);
+    expect(authorized.status).toBe(200);
+    expect(stored?.tenantId).toBe("tenant-a");
+  });
+
+  test("hides tenant records from another authenticated tenant", async () => {
+    const runtime = await createRuntime();
+    runtime.registerAgent(defineAgent({ name: "assistant", model: testModel }));
+    const app = await createApp(runtime, {
+      auth: { async authenticate(request) { const tenantId = request.headers.get("authorization") === "Bearer b" ? "tenant-b" : "tenant-a"; return { subjectId: tenantId, tenantId, permissions: [] }; } },
+    });
+    const created = await app.handle(new Request("http://localhost/run", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer a" }, body: JSON.stringify({ input: "hello" }) }));
+    const { runId } = await created.json();
+    const inspected = await app.handle(new Request(`http://localhost/runs/${runId}`, { headers: { authorization: "Bearer b" } }));
+    expect(inspected.status).toBe(404);
+  });
+
+  test("manages tenant-scoped curated memory with permissions", async () => {
+    const runtime = await createRuntime();
+    const principal = { subjectId: "user", tenantId: "tenant-a", permissions: ["memory:read", "memory:write", "memory:delete"] };
+    const app = await createApp(runtime, { auth: { async authenticate() { return principal; } } });
+    const created = await app.handle(new Request("http://localhost/memories", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: "Customer prefers email", expiresAt: new Date(Date.now() + 60_000).toISOString() }) }));
+    const record = await created.json();
+    expect(created.status).toBe(201);
+    const listed = await app.handle(new Request("http://localhost/memories"));
+    expect((await listed.json()).records).toHaveLength(1);
+    const deleted = await app.handle(new Request(`http://localhost/memories/${record.id}`, { method: "DELETE" }));
+    expect(deleted.status).toBe(200);
+  });
   test("does not serve a GUI", async () => {
     const response = await (await createTestApp()).handle(new Request("http://localhost/"));
 

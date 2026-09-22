@@ -10,6 +10,10 @@ get {
   auth: none
 }
 
+headers {
+  cookie: {{sessionCookie}}
+}
+
 assert {
   res.status: eq 200
   res.body.id: isString

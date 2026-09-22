@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent": "./src/agent/index.ts",
+    "./auth": "./src/auth/index.ts",
     "./tool": "./src/tool/index.ts",
     "./model": "./src/model/index.ts",
     "./memory": "./src/memory/index.ts",

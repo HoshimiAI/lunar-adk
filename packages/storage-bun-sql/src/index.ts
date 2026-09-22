@@ -116,6 +116,7 @@ export interface BunSqlStores extends StorageBundle {
   sessionStore: SessionStore;
   workflowStore: WorkflowStore;
   close(): Promise<void>;
+  health(): Promise<void>;
 }
 
 export async function createBunSqlStores(options: BunSqlStorageOptions): Promise<BunSqlStores> {
@@ -126,11 +127,31 @@ export async function createBunSqlStores(options: BunSqlStorageOptions): Promise
   const runs = new BunSqlStore<Run>(client, dialect, "runs", transactionQueue);
   const sessions = new BunSqlStore<Session>(client, dialect, "sessions", transactionQueue);
   const workflows = new BunSqlStore<WorkflowRun>(client, dialect, "workflow-runs", transactionQueue);
+  const saveRunAndSession = dialect !== "postgres" ? undefined : async (run: Run, session: Session, saveOptions: SaveOptions = {}) => {
+    return await client.begin(async (transaction) => {
+      const tx = transaction as SQL;
+      const runRows = await tx.unsafe("SELECT value FROM lunar_runs WHERE id = $1 FOR UPDATE", [run.id]);
+      const sessionRows = await tx.unsafe("SELECT value FROM lunar_sessions WHERE id = $1 FOR UPDATE", [session.id]);
+      const currentRun = runRows[0] ? JSON.parse((runRows[0] as { value: string }).value) as Run : undefined;
+      const currentSession = sessionRows[0] ? JSON.parse((sessionRows[0] as { value: string }).value) as Session : undefined;
+      if (saveOptions.expectedRevision === undefined && currentRun) throw new StorageConflictError("runs", run.id, undefined, currentRun.revision);
+      if (saveOptions.expectedSessionRevision === undefined && currentSession) throw new StorageConflictError("sessions", session.id, undefined, currentSession.revision);
+      if (saveOptions.expectedRevision !== undefined && (currentRun?.revision ?? 0) !== saveOptions.expectedRevision) throw new StorageConflictError("runs", run.id, saveOptions.expectedRevision, currentRun?.revision);
+      if (saveOptions.expectedSessionRevision !== undefined && (currentSession?.revision ?? 0) !== saveOptions.expectedSessionRevision) throw new StorageConflictError("sessions", session.id, saveOptions.expectedSessionRevision, currentSession?.revision);
+      const savedRun = { ...run, revision: (currentRun?.revision ?? -1) + 1 };
+      const savedSession = { ...session, revision: (currentSession?.revision ?? -1) + 1 };
+      await tx.unsafe("INSERT INTO lunar_runs (id, value) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value", [savedRun.id, JSON.stringify(savedRun)]);
+      await tx.unsafe("INSERT INTO lunar_sessions (id, value) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value", [savedSession.id, JSON.stringify(savedSession)]);
+      return { run: savedRun, session: savedSession };
+    }) as { run: Run; session: Session };
+  };
   return {
-    capabilities: { optimisticConcurrency: true, atomicRunSession: false },
+    capabilities: { optimisticConcurrency: true, atomicRunSession: dialect === "postgres" },
     runStore: runs,
     sessionStore: sessions,
     workflowStore: workflows,
+    ...(saveRunAndSession ? { saveRunAndSession } : {}),
+    health: async () => { await client.unsafe("SELECT 1"); },
     close: async () => { await client.close(); },
   };
 }

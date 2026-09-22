@@ -4,6 +4,7 @@ import type { Run } from "../run";
 export interface Session {
   id: string;
   revision?: number;
+  tenantId?: string;
   history: ModelMessage[];
   runIds?: string[];
   /** @deprecated Compatibility view containing run references. */
