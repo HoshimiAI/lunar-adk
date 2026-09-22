@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added opt-in agent memory retrieval and conversation storage.
+- Added namespaces, metadata filters, deletion, lifecycle ownership, and duplicate-ID protection for memory providers.
+- Made adapter revision checks atomic and added a reusable storage conformance verifier.
+- Added explicit storage capabilities for atomic run/session persistence.
+
 - Fixed plugin workflow registration by sharing the runtime workflow registry.
 - Added revision-aware storage saves and stale-write conflict detection.
 - Normalized sessions to store run references instead of full run records.

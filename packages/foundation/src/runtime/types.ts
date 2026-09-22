@@ -19,7 +19,8 @@ export interface SteeringResult {
 
 export interface RuntimeConfig {
   plugins?: Plugin[];
-  memory?: MemoryProvider;
+  memory?: MemoryProvider | MemoryProvider[];
+  ownsMemory?: boolean;
   runStore?: RunStore;
   sessionStore?: SessionStore;
   workflowStore?: WorkflowStore;
@@ -39,6 +40,7 @@ export interface RuntimeHandle {
   getRun(runId: string): Run | undefined;
   getStoredRun(runId: string): Promise<Run | undefined>;
   getSession(sessionId: string): Promise<Session | undefined>;
+  getMemoryProvider(id?: string): MemoryProvider | undefined;
   on(event: EventName, handler: EventHandler): () => void;
   registerAgent(agent: Agent): void;
   registerWorkflow(workflow: Workflow): void;

@@ -23,7 +23,10 @@ export async function bootstrap(
   const agents = new AgentRegistry();
   const tools = new ToolRegistry();
   const memory = new MemoryRegistry();
-  memory.register(memoryProvider ?? createInMemoryProvider());
+  const memoryProviders = memoryProvider === undefined
+    ? [createInMemoryProvider()]
+    : Array.isArray(memoryProvider) ? memoryProvider : [memoryProvider];
+  for (const provider of memoryProviders) memory.register(provider);
   const evaluators = new EvaluatorRegistry();
   const events = new EventBus();
   const workflows = new Map<string, Workflow>();

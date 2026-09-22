@@ -12,6 +12,9 @@ export class InMemoryWorkflowStore implements WorkflowStore {
 
   async save(run: WorkflowRun, options: SaveOptions = {}): Promise<WorkflowRun> {
     const current = this.runs.get(run.id);
+    if (options.expectedRevision === undefined && current) {
+      throw new StorageConflictError("workflow-runs", run.id, undefined, current.revision);
+    }
     if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
       throw new StorageConflictError("workflow-runs", run.id, options.expectedRevision, current?.revision);
     }

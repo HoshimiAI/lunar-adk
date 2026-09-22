@@ -2,7 +2,7 @@ export { createRuntime } from "./runtime";
 export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "./runtime";
 
 export { AgentRunError, defineAgent } from "./agent";
-export type { Agent, AgentConfig, AgentRunOptions, AgentRunResult, AgentErrorCode } from "./agent";
+export type { Agent, AgentConfig, AgentMemoryConfig, AgentRunOptions, AgentRunResult, AgentErrorCode } from "./agent";
 
 export { defineTool } from "./tool";
 export type { Tool, ToolResult, ToolPermission } from "./tool";
@@ -36,7 +36,7 @@ export type {
 export { InMemoryWorkflowStore, WorkflowApprovalRequired } from "./workflow";
 
 export { createMemory, createInMemoryProvider, MemoryRegistry } from "./memory";
-export type { MemoryProvider, MemoryRecord, MemoryQuery } from "./memory";
+export type { MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery } from "./memory";
 
 export type { Run, RunStatus, PendingApproval, RunContinuation } from "./run";
 export { InMemoryRunStore } from "./run";
@@ -46,4 +46,4 @@ export type { Session, SessionStore } from "./session";
 export type { LunarEvent, EventName } from "./event";
 export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "./observability";
 export { StorageConflictError } from "./storage";
-export type { StorageBundle, SaveOptions } from "./storage";
+export type { StorageBundle, StorageCapabilities, SaveOptions } from "./storage";

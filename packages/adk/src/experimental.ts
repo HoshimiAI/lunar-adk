@@ -1,5 +1,5 @@
 export { createMemory } from "@lunar/foundation/memory";
-export type { MemoryProvider, MemoryRecord, MemoryQuery } from "@lunar/foundation/memory";
+export type { MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery } from "@lunar/foundation/memory";
 
 export { definePlugin } from "@lunar/foundation/plugin";
 export type { Plugin, PluginContext, PluginManifest, PluginPermissions } from "@lunar/foundation/plugin";

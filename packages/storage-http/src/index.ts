@@ -61,14 +61,8 @@ class HttpStore<T extends StoredRecord> {
   }
 
   async save(value: T, options: SaveOptions = {}): Promise<T> {
-    const current = options.expectedRevision === undefined && value.revision === undefined
-      ? undefined
-      : await this.get(value.id);
-    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
-      throw new StorageConflictError(this.resource, value.id, options.expectedRevision, current?.revision);
-    }
-    const saved = { ...value, revision: (current?.revision ?? -1) + 1 } as T & { revision: number };
-    await this.request(saved.id, "PUT", saved, saved.revision === 0 ? undefined : saved.revision - 1);
+    const saved = { ...value, revision: (options.expectedRevision ?? -1) + 1 } as T & { revision: number };
+    await this.request(saved.id, "PUT", saved, options.expectedRevision, options.expectedRevision === undefined);
     return saved as T;
   }
 
@@ -82,8 +76,8 @@ class HttpStore<T extends StoredRecord> {
     await Promise.allSettled(this.pending);
   }
 
-  private async request(id: string, method: "GET" | "PUT", value?: T, expectedRevision?: number): Promise<unknown> {
-    const operation = this.requestWithRetry(id, method, value, expectedRevision);
+  private async request(id: string, method: "GET" | "PUT", value?: T, expectedRevision?: number, createOnly = false): Promise<unknown> {
+    const operation = this.requestWithRetry(id, method, value, expectedRevision, createOnly);
     this.pending.add(operation);
     try {
       return await operation;
@@ -92,7 +86,7 @@ class HttpStore<T extends StoredRecord> {
     }
   }
 
-  private async requestWithRetry(id: string, method: "GET" | "PUT", value?: T, expectedRevision?: number): Promise<unknown> {
+  private async requestWithRetry(id: string, method: "GET" | "PUT", value?: T, expectedRevision?: number, createOnly = false): Promise<unknown> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       try {
@@ -106,6 +100,7 @@ class HttpStore<T extends StoredRecord> {
               ...this.headers,
               ...(value === undefined ? {} : { "content-type": "application/json" }),
               ...(expectedRevision === undefined ? {} : { "if-match": String(expectedRevision) }),
+              ...(createOnly ? { "if-none-match": "*" } : {}),
             },
             body: value === undefined ? undefined : JSON.stringify(value),
             signal: controller.signal,
@@ -115,7 +110,7 @@ class HttpStore<T extends StoredRecord> {
         }
 
         if (response.status === 404 && method === "GET") return undefined;
-        if (response.status === 409) {
+        if (response.status === 409 || response.status === 412) {
           throw new StorageConflictError(this.resource, id, expectedRevision, undefined);
         }
         if (response.ok) {
@@ -164,6 +159,7 @@ export function createHttpStores(options: HttpStorageOptions): HttpStores {
   const sessions = new HttpStore<Session>("sessions", options);
   const workflows = new HttpStore<WorkflowRun>("workflow-runs", options);
   return {
+    capabilities: { optimisticConcurrency: true, atomicRunSession: false },
     runStore: runs,
     sessionStore: sessions,
     workflowStore: workflows,

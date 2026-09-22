@@ -25,7 +25,8 @@ return compatible bundles for local and remote deployments.
 
 Pass a complete `storage` bundle to compose all three stores at once. Set
 `ownsStorage: true` when the runtime should close that bundle from
-`runtime.shutdown()`; application-managed bundles should leave it unset.
+`runtime.shutdown()`; application-managed bundles should leave it unset. A
+bundle cannot be mixed with individual store overrides.
 
 Persisted runs, sessions, and workflow runs carry revisions. Store updates can
 reject stale revisions with `StorageConflictError`, allowing multiple runtime
@@ -33,7 +34,7 @@ instances to detect lost-update races.
 
 The handle exposes `run`, `stream`, `supportsStreaming`, `steer`, `approve`,
 `reject`, `cancel`, `getRun`, `getStoredRun`, `getSession`, `on`,
-`registerAgent`, `registerWorkflow`, `runWorkflow`, `getWorkflowRun`,
+`getMemoryProvider`, `registerAgent`, `registerWorkflow`, `runWorkflow`, `getWorkflowRun`,
 `resumeWorkflow`, and `cancelWorkflow`.
 
 ### Runtime methods
@@ -50,6 +51,7 @@ The handle exposes `run`, `stream`, `supportsStreaming`, `steer`, `approve`,
 - `getRun(runId)` reads the in-process run map; `getStoredRun(runId)` reads the
   configured store.
 - `getSession(sessionId)` reads a stored session.
+- `getMemoryProvider(id?)` returns the selected custom memory provider.
 - `on(event, handler)` subscribes to an event and returns an unsubscribe
   function.
 - `registerAgent(agent)` and `registerWorkflow(workflow)` add runtime behavior.
@@ -61,7 +63,9 @@ The handle exposes `run`, `stream`, `supportsStreaming`, `steer`, `approve`,
 ## `defineAgent(config, eventBus?)`
 
 Accepts `name`, `model`, optional `systemPrompt`, `tools`,
-`maxToolRoundtrips`, `retryPolicy`, and `maxContextTokens`. Returns an `Agent`
+`maxToolRoundtrips`, `retryPolicy`, `maxContextTokens`, and opt-in `memory`.
+Memory options select a provider, namespace, metadata filter, retrieval limit,
+and whether completed conversations are stored. Returns an `Agent`
 with `run(input, options?)`.
 
 ## `defineTool<Input, Output>(tool)`

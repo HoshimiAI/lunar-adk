@@ -12,6 +12,9 @@ export class InMemoryRunStore implements RunStore {
 
   async save(run: Run, options: SaveOptions = {}): Promise<Run> {
     const current = this.runs.get(run.id);
+    if (options.expectedRevision === undefined && current) {
+      throw new StorageConflictError("runs", run.id, undefined, current.revision);
+    }
     if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
       throw new StorageConflictError("runs", run.id, options.expectedRevision, current?.revision);
     }

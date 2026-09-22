@@ -5,6 +5,7 @@ export { AgentRunError, defineAgent } from "@lunar/foundation/agent";
 export type {
   Agent,
   AgentConfig,
+  AgentMemoryConfig,
   AgentRunOptions,
   AgentRunResult,
   AgentState,
@@ -35,10 +36,10 @@ export type { Session, SessionStore } from "@lunar/foundation/session";
 export type { LunarEvent, EventName } from "@lunar/foundation/event";
 export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "@lunar/foundation/observability";
 export { StorageConflictError } from "@lunar/foundation/storage";
-export type { StorageBundle, SaveOptions } from "@lunar/foundation/storage";
+export type { StorageBundle, StorageCapabilities, SaveOptions } from "@lunar/foundation/storage";
 
 export { createMemory, createInMemoryProvider, MemoryRegistry } from "@lunar/foundation/memory";
-export type { MemoryProvider, MemoryRecord, MemoryQuery } from "@lunar/foundation/memory";
+export type { MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery } from "@lunar/foundation/memory";
 
 export { defineWorkflow, InMemoryWorkflowStore, WorkflowApprovalRequired } from "@lunar/foundation/workflow";
 export type {

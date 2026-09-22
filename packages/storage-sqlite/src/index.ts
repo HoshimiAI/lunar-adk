@@ -39,21 +39,39 @@ function initialize(database: Database): void {
   }
 }
 
+function saveRecord<T extends { id: string; revision?: number }>(
+  database: Database,
+  table: "lunar_runs" | "lunar_sessions" | "lunar_workflow_runs",
+  resource: string,
+  value: T,
+  options: SaveOptions,
+): T {
+  const transaction = (database as Database & {
+    transaction<Result>(callback: () => Result): () => Result;
+  }).transaction(() => {
+    const row = database.query(`SELECT value FROM ${table} WHERE id = ?1`).get(value.id) as { value: string } | null;
+    const current = row ? JSON.parse(row.value) as T : undefined;
+    if (options.expectedRevision === undefined && current) {
+      throw new StorageConflictError(resource, value.id, undefined, current.revision);
+    }
+    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
+      throw new StorageConflictError(resource, value.id, options.expectedRevision, current?.revision);
+    }
+    const saved = { ...value, revision: (current?.revision ?? -1) + 1 };
+    database.query(`INSERT INTO ${table} (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value`)
+      .run(saved.id, JSON.stringify(saved));
+    return saved;
+  });
+  return transaction();
+}
+
 export class SqliteWorkflowStore implements WorkflowStore {
   constructor(readonly database: Database) {
     initialize(database);
   }
 
   async save(run: WorkflowRun, options: SaveOptions = {}): Promise<WorkflowRun> {
-    const current = await this.get(run.id);
-    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
-      throw new StorageConflictError("workflow-runs", run.id, options.expectedRevision, current?.revision);
-    }
-    const saved = { ...run, revision: (current?.revision ?? -1) + 1 };
-    this.database
-      .query("INSERT INTO lunar_workflow_runs (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
-      .run(saved.id, JSON.stringify(saved));
-    return saved;
+    return saveRecord(this.database, "lunar_workflow_runs", "workflow-runs", run, options);
   }
 
   async get(id: string): Promise<WorkflowRun | undefined> {
@@ -70,15 +88,7 @@ export class SqliteRunStore implements RunStore {
   }
 
   async save(run: Run, options: SaveOptions = {}): Promise<Run> {
-    const current = await this.get(run.id);
-    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
-      throw new StorageConflictError("runs", run.id, options.expectedRevision, current?.revision);
-    }
-    const saved = { ...run, revision: (current?.revision ?? -1) + 1 };
-    this.database
-      .query("INSERT INTO lunar_runs (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
-      .run(saved.id, JSON.stringify(saved));
-    return saved;
+    return saveRecord(this.database, "lunar_runs", "runs", run, options);
   }
 
   async get(id: string): Promise<Run | undefined> {
@@ -95,15 +105,7 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   async save(session: Session, options: SaveOptions = {}): Promise<Session> {
-    const current = await this.get(session.id);
-    if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
-      throw new StorageConflictError("sessions", session.id, options.expectedRevision, current?.revision);
-    }
-    const saved = { ...session, revision: (current?.revision ?? -1) + 1 };
-    this.database
-      .query("INSERT INTO lunar_sessions (id, value) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET value = excluded.value")
-      .run(saved.id, JSON.stringify(saved));
-    return saved;
+    return saveRecord(this.database, "lunar_sessions", "sessions", session, options);
   }
 
   async get(id: string): Promise<Session | undefined> {
@@ -134,6 +136,12 @@ export function createSqliteStores(database: string | Database = "lunar.db"): Sq
       const sessionRow = opened.query("SELECT value FROM lunar_sessions WHERE id = ?1").get(session.id) as { value: string } | null;
       const currentRun = runRow ? JSON.parse(runRow.value) as Run : undefined;
       const currentSession = sessionRow ? JSON.parse(sessionRow.value) as Session : undefined;
+      if (options.expectedRevision === undefined && currentRun) {
+        throw new StorageConflictError("runs", run.id, undefined, currentRun.revision);
+      }
+      if (options.expectedSessionRevision === undefined && currentSession) {
+        throw new StorageConflictError("sessions", session.id, undefined, currentSession.revision);
+      }
       if (options.expectedRevision !== undefined && (currentRun?.revision ?? 0) !== options.expectedRevision) {
         throw new StorageConflictError("runs", run.id, options.expectedRevision, currentRun?.revision);
       }
@@ -151,6 +159,7 @@ export function createSqliteStores(database: string | Database = "lunar.db"): Sq
     return Promise.resolve({ run: savedRun!, session: savedSession! });
   };
   return {
+    capabilities: { optimisticConcurrency: true, atomicRunSession: true },
     database: opened,
     runStore: new SqliteRunStore(opened),
     sessionStore: new SqliteSessionStore(opened),

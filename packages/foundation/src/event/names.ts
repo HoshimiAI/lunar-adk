@@ -16,6 +16,7 @@ export const EVENT_NAMES = [
   "workflow.failed",
   "memory.created",
   "memory.retrieved",
+  "memory.failed",
   "plugin.registered",
   "plugin.enabled",
 ] as const;

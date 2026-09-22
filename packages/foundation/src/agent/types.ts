@@ -5,8 +5,17 @@ import type { RetryPolicy } from "./retry";
 import type { EventBus } from "../event";
 import type { Run, RunContinuation } from "../run";
 import type { LunarEvent } from "../event";
+import type { MemoryProvider } from "../memory";
 
 export type AgentState = "idle" | "running" | "waiting" | "done" | "error";
+
+export interface AgentMemoryConfig {
+  providerId?: string;
+  retrieveLimit?: number;
+  store?: "none" | "conversation";
+  namespace?: string;
+  filter?: Record<string, unknown>;
+}
 
 export interface AgentConfig {
   name: string;
@@ -16,6 +25,7 @@ export interface AgentConfig {
   maxToolRoundtrips?: number;
   retryPolicy?: RetryPolicy;
   maxContextTokens?: number;
+  memory?: boolean | AgentMemoryConfig;
 }
 
 export interface AgentRunOptions {
@@ -33,6 +43,7 @@ export interface AgentRunOptions {
   parentRunId?: string;
   onInterrupted?: (continuation: RunContinuation) => void;
   onSteered?: (event: { interruptedRunId: string; continuationRunId: string; sessionId: string }) => void;
+  memoryProvider?: MemoryProvider;
 }
 
 export interface AgentRunResult {
@@ -44,5 +55,6 @@ export interface Agent {
   name: string;
   modelId?: string;
   supportsStreaming?: boolean;
+  memory?: AgentMemoryConfig;
   run(input: string, options?: AgentRunOptions): Promise<AgentRunResult>;
 }

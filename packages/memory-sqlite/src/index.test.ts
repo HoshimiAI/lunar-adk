@@ -24,4 +24,15 @@ describe("createSqliteMemoryProvider", () => {
     expect((await provider.retrieve({ text: "100%", limit: 1 })).map((record) => record.content)).toEqual(["100% complete"]);
     provider.close();
   });
+
+  test("supports namespaces, metadata filters, and deletion", async () => {
+    const provider = createSqliteMemoryProvider(new Database(":memory:"));
+    const kept = await provider.store({ content: "shared text", namespace: "one", metadata: { tenant: "a" } });
+    await provider.store({ content: "shared text", namespace: "two", metadata: { tenant: "b" } });
+
+    expect(await provider.retrieve({ text: "shared", namespace: "one", filter: { tenant: "a" } })).toHaveLength(1);
+    expect(await provider.delete?.(kept.id)).toBe(true);
+    expect(await provider.retrieve({ text: "shared", namespace: "one" })).toEqual([]);
+    provider.close();
+  });
 });

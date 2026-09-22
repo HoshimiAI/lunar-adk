@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { createHttpStores, HttpStorageError } from "./index";
+import { verifyStorageBundle } from "@lunar/foundation/storage/testing";
 
 test("persists and reads records through the HTTP contract", async () => {
   const records = new Map<string, unknown>();
@@ -14,7 +15,16 @@ test("persists and reads records through the HTTP contract", async () => {
       const url = new URL(request.url);
       const key = url.pathname;
       if (request.method === "PUT") {
-        records.set(key, await request.json());
+        const body = await request.json();
+        const current = records.get(key) as { revision?: number } | undefined;
+        if (request.headers.get("if-none-match") === "*" && current !== undefined) {
+          return new Response("conflict", { status: 412 });
+        }
+        const expected = request.headers.get("if-match");
+        if (expected !== null && (current?.revision ?? 0) !== Number(expected)) {
+          return new Response("conflict", { status: 412 });
+        }
+        records.set(key, body);
         return new Response(null, { status: 204 });
       }
       const value = records.get(key);
@@ -30,7 +40,9 @@ test("persists and reads records through the HTTP contract", async () => {
   expect(restored?.id).toBe("run-1");
   expect(requests[0]?.headers.get("authorization")).toBe("Bearer secret");
   expect(requests[0]?.headers.get("x-tenant")).toBe("tenant-1");
+  expect(requests[0]?.headers.get("if-none-match")).toBe("*");
   expect(await stores.runStore.get("missing")).toBeUndefined();
+  await verifyStorageBundle(stores);
   await stores.close?.();
 });
 

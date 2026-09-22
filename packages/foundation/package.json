@@ -17,6 +17,7 @@
     "./evaluation": "./src/evaluation/index.ts",
     "./observability": "./src/observability/index.ts",
     "./storage": "./src/storage/index.ts",
+    "./storage/testing": "./src/storage/testing.ts",
     "./runtime": "./src/runtime/index.ts",
     "./types": "./src/types/index.ts",
     "./package.json": "./package.json"

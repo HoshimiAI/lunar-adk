@@ -12,6 +12,9 @@ export class InMemorySessionStore implements SessionStore {
 
   async save(session: Session, options: SaveOptions = {}): Promise<Session> {
     const current = this.sessions.get(session.id);
+    if (options.expectedRevision === undefined && current) {
+      throw new StorageConflictError("sessions", session.id, undefined, current.revision);
+    }
     if (options.expectedRevision !== undefined && (current?.revision ?? 0) !== options.expectedRevision) {
       throw new StorageConflictError("sessions", session.id, options.expectedRevision, current?.revision);
     }

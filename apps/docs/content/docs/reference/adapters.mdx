@@ -84,8 +84,10 @@ and workflow runs to collections using `replaceOne(..., { upsert: true })`.
 The package intentionally does not own a MongoDB SDK dependency.
 
 All storage adapters implement revision-aware saves. HTTP adapters send the
-expected revision as `If-Match`; a compatible remote service should reject a
-stale write with `409 Conflict`.
+expected revision as `If-Match` and create-only writes as `If-None-Match: *`;
+a compatible remote service must reject stale writes with `409` or `412`.
+Adapters expose `capabilities.atomicRunSession` so applications can distinguish
+atomic bundles from stores that persist runs and sessions separately.
 
 ## `@lunar/observability-otel`
 

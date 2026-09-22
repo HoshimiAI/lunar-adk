@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import { unlinkSync } from "node:fs";
 import { createRuntime, defineAgent, defineTool, defineWorkflow } from "@lunar/foundation";
 import type { ModelProvider } from "@lunar/foundation/model";
+import { verifyStorageBundle } from "@lunar/foundation/storage/testing";
 import { createSqliteStores, SQLITE_SCHEMA_VERSION } from "./index";
 
 test("persists runs and sessions in SQLite", async () => {
@@ -28,6 +29,7 @@ test("persists runs and sessions in SQLite", async () => {
   expect(restoredSession?.history.map((message) => message.content)).toEqual(["hello", "persisted"]);
   expect(restoredSession?.runs[0]?.id).toBe(result.run.id);
   expect(restoredSession?.runIds).toEqual([result.run.id]);
+  await verifyStorageBundle(stores);
   await runtime.shutdown?.();
 });
 

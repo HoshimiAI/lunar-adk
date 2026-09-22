@@ -101,8 +101,9 @@ Package: `@lunar/foundation/session`
 Packages: `@lunar/foundation/memory`, `@lunar/foundation/evaluation`
 
 - `createMemory(provider)` preserves a `MemoryProvider`.
-- `createInMemoryProvider(id?)` creates a simple in-memory memory provider.
-- `MemoryRegistry` registers memory providers.
+- `createInMemoryProvider(id?)` creates a namespace- and metadata-aware development provider.
+- `MemoryRegistry` registers providers and rejects duplicate IDs unless replacement is explicit.
+- `MemoryProvider` supports custom retrieval, optional capabilities, deletion, and lifecycle cleanup.
 - `defineEvaluator(evaluator)` preserves an evaluator definition.
 - `normalize(score)` normalizes an evaluation score.
 - `EvaluatorRegistry` registers evaluators.

@@ -12,29 +12,32 @@ import { createSqliteStores } from '@lunar/storage-sqlite';
 
 const storage = createSqliteStores(process.env.SQLITE_PATH ?? 'lunar.db');
 const runtime = await createRuntime({
-  runStore: storage.runStore,
-  sessionStore: storage.sessionStore,
-  workflowStore: storage.workflowStore,
+  storage,
+  ownsStorage: true,
 });
 
-// Call storage.close() during application shutdown.
+// Closes owned storage and memory providers.
+await runtime.shutdown();
 ```
 
 Memory is independently configurable. Pass any implementation of
-`MemoryProvider` to `createRuntime()`; it is registered for plugins under its
+`MemoryProvider` to `createRuntime()`; opt-in agents and plugins select it by
 provider ID. The default is the in-memory provider.
 
 For durable SQLite memory, use `@lunar/memory-sqlite`:
 
 ```ts
-import { createRuntime } from '@lunar/adk';
+import { createRuntime, defineAgent } from '@lunar/adk';
 import { createSqliteMemoryProvider } from '@lunar/memory-sqlite';
 
 const memory = createSqliteMemoryProvider('lunar-memory.db');
-const runtime = await createRuntime({ memory });
+const runtime = await createRuntime({ memory, ownsMemory: true });
 
-// Close application-owned providers during shutdown.
-memory.close();
+runtime.registerAgent(defineAgent({
+  name: 'assistant',
+  model,
+  memory: { providerId: 'sqlite', namespace: 'assistant', retrieveLimit: 5 },
+}));
 ```
 
 Memory and runtime storage are separate ports, so an application can use a
@@ -45,6 +48,19 @@ Sessions keep run IDs and a deprecated compact `runs` compatibility view;
 complete run records remain in the run store. Persisted records use revisions
 for optimistic concurrency, and stale writes are rejected with
 `StorageConflictError`.
+
+Custom stores must treat a save without `expectedRevision` as create-only and
+must atomically reject stale revisions. Run custom bundles through
+`verifyStorageBundle()` from `@lunar/foundation/storage/testing`. Bundle
+capabilities declare whether run/session writes are atomic together.
+
+Custom memory providers can implement semantic search internally. The common
+query supports namespaces, exact metadata filters, score thresholds, and
+limits. Providers may also expose deletion and lifecycle hooks through the
+optional capabilities, `delete()`, and `close()` members.
+Retrieval and storage failures emit `memory.failed` and do not fail the agent
+run. Automatic retrieval and conversation storage happen only for agents that
+set `memory` in `defineAgent()`.
 
 `createSqliteStores()` accepts a database path or an existing Bun SQLite
 `Database`. It returns the database handle, `SqliteRunStore`,
@@ -60,9 +76,7 @@ const storage = createHttpStores({
   token: process.env.STORAGE_HTTP_TOKEN,
 });
 const runtime = await createRuntime({
-  runStore: storage.runStore,
-  sessionStore: storage.sessionStore,
-  workflowStore: storage.workflowStore,
+  storage,
 });
 ```
 
