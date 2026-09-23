@@ -63,8 +63,9 @@ See [models and providers](/docs/guides/models-and-providers).
   cleanup.
 
 Available storage: SQLite, Bun.SQL (SQLite, PostgreSQL, MySQL/MariaDB), HTTP,
-and application-supplied MongoDB collections. Available memory: in-memory,
-SQLite, and tenant-scoped PostgreSQL full-text search through Bun.SQL.
+Unknown Planet (PostgreSQL), and application-supplied MongoDB collections.
+Available memory: in-memory, SQLite, tenant-scoped PostgreSQL full-text search
+through Bun.SQL, and the optional scoped Unknown Planet memory adapter.
 
 See [persistence](/docs/guides/persistence).
 
@@ -120,6 +121,7 @@ See [security](/docs/security), [observability](/docs/observability), and the
 | `@lunar/provider-ai-sdk` | Generic AI SDK model provider factory |
 | `@lunar/storage-sqlite` | Bun SQLite storage bundle |
 | `@lunar/storage-bun-sql` | Bun.SQL SQLite, PostgreSQL, and MySQL storage bundle |
+| `@lunar/storage-unknown-planet` | Scoped PostgreSQL storage and memory adapters for Unknown Planet |
 | `@lunar/storage-http` | Revision-aware remote HTTP storage bundle |
 | `@lunar/storage-mongo` | MongoDB collection-contract storage bundle |
 | `@lunar/memory-sqlite` | Bun SQLite memory provider |

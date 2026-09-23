@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added Unknown Planet adapters for revision-safe Lunar storage and scoped memory search.
 - Added tenant-aware runtime records, authenticated Elysia composition, and a Better Auth adapter contract.
 - Added PostgreSQL full-text curated memory with expiry and permission-protected management routes.
 - Added atomic PostgreSQL run/session persistence through the Bun.SQL storage bundle.

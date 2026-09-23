@@ -1,0 +1,14 @@
+{
+  "name": "@lunar/storage-unknown-planet",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "peerDependencies": {
+    "@lunar/foundation": "^1.0.0",
+    "@unknown-planet/sdk": "^1.0.0"
+  }
+}

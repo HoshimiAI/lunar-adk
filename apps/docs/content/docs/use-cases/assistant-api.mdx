@@ -3,8 +3,9 @@ title: "Use case: assistant API"
 description: Build a conversational JSON and streaming API with Elysia
 ---
 
-This use case combines an OpenAI provider, an agent, SQLite stores, and the
-Elysia adapter into a service that supports multi-turn conversations.
+This use case combines an OpenAI provider, an agent, persistent stores, and the
+Elysia service into a multi-turn API with JSON responses, server-sent events,
+session inspection, cancellation, and optional authentication.
 
 ## Runtime setup
 
@@ -15,8 +16,8 @@ import { createSqliteStores } from '@lunar/storage-sqlite';
 
 const storage = createSqliteStores(process.env.SQLITE_PATH ?? 'lunar.db');
 const runtime = await createRuntime({
-  runStore: storage.runStore,
-  sessionStore: storage.sessionStore,
+  storage,
+  ownsStorage: true,
 });
 
 runtime.registerAgent(defineAgent({
@@ -29,16 +30,24 @@ runtime.registerAgent(defineAgent({
 }));
 ```
 
-Expose `runtime.run()` from a JSON route and `runtime.stream()` from an SSE
-route. Return the run and session IDs to clients so they can continue the same
-conversation, inspect execution state, or cancel an active run.
+The reference Elysia app exposes these flows directly. Start it with
+`bun run --cwd apps/elysia start`; set `OPENAI_API_KEY` and optionally
+`SQLITE_PATH` (default `lunar.db`). Its `POST /run` accepts `{ input,
+sessionId? }` and returns output, run/session IDs, status, token usage, and
+timing metrics. `POST /run/stream` accepts the same body and emits SSE events
+including `text.delta` and `stream.completed`.
 
 ## Client flow
 
-1. `POST /run` with an input creates a run and returns `sessionId`.
-2. Send that session ID with the next `/run` request to preserve history.
-3. Use `/sessions/:id` to render conversation state.
-4. Use `/run/stream` when the UI needs incremental text.
-5. Use `/runs/:id/cancel` when a user stops generation.
+1. `POST /run` with an input creates a run and returns `runId` and `sessionId`.
+2. Send that `sessionId` with the next `/run` request to continue the history.
+3. Use `GET /sessions/:id` and `GET /runs/:id` to render conversation and
+   execution state.
+4. Use `POST /run/stream` when the UI needs incremental text.
+5. Use `POST /runs/:id/cancel` when a user stops generation, or
+   `POST /sessions/:id/steer` to redirect the current or next turn.
 
-Close the SQLite stores from the server shutdown hook.
+The reference app closes owned stores on shutdown. For a shared deployment,
+select a shared storage adapter; see [Unknown Planet storage](/docs/use-cases/unknown-planet)
+and [persistence](/docs/guides/persistence). If authentication is configured,
+the app scopes runs and sessions to the authenticated tenant and subject.

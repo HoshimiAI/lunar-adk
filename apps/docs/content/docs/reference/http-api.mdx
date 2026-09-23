@@ -95,7 +95,11 @@ stated principal permission:
 | `POST` | `/memories` | `memory:write` | Creates a record with `content`, a future ISO `expiresAt`, and optional `namespace` and `metadata` |
 | `POST` | `/memories/upload` | `memory:write` | Accepts multipart `file` (UTF-8 text, up to 5 MiB) and future ISO `expiresAt`; chunks it into memory records and embeds each chunk when embeddings are configured |
 | `GET` | `/memories` | `memory:read` | Returns a paginated memory page; accepts optional `namespace`, `cursor`, and `limit` query parameters |
-| `DELETE` | `/memories/:id` | `memory:delete` | Deletes a record owned by the current tenant |
+| `POST` | `/memories/search` | `memory:read` | Searches `{ text, namespace?, limit? }` using embeddings when configured, otherwise provider text search |
+| `DELETE` | `/memories/:id` | `memory:delete` | Deletes a record owned by the current tenant and principal |
+
+Reads, searches, and deletes are scoped to the authenticated principal's tenant
+and owner. Expired records are excluded from retrieval and listing.
 
 Create requests return `201`. Missing memory configuration or records return
 `404`; malformed or expired create input returns `422`; missing permission

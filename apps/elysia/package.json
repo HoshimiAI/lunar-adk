@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
+    "live:unknown-planet": "bun src/live-unknown-planet.ts",
     "demo:plugin": "bun src/plugin-demo.ts",
     "test:live": "RUN_LIVE_TESTS=1 bun test src/live.test.ts",
     "test:production": "RUN_LIVE_TESTS=1 bun test src/live.test.ts",
@@ -16,6 +17,8 @@
     "@lunar/storage-sqlite": "workspace:*",
     "@lunar/storage-http": "workspace:*",
     "@lunar/storage-bun-sql": "workspace:*",
+    "@lunar/storage-unknown-planet": "workspace:*",
+    "@unknown-planet/sdk": "^1.0.0",
     "@lunar/memory-bun-sql": "workspace:*",
     "@lunar/auth-better-auth": "workspace:*",
     "better-auth": "^1.6.0",

@@ -16,16 +16,17 @@ export function createInMemoryProvider(id = "in-memory"): MemoryProvider {
 
   return {
     id,
-    capabilities: { metadataFiltering: true, namespaces: true, deletion: true },
+    capabilities: { semanticSearch: true, metadataFiltering: true, namespaces: true, deletion: true },
     async store(record) {
       const stored: MemoryRecord = { ...record, id: crypto.randomUUID(), createdAt: Date.now() };
       records.push(stored);
       return stored;
     },
     async retrieve(query) {
+      const now = Date.now();
       const matched = records
-        .filter((record) => query.embedding !== undefined || record.content.includes(query.text))
-        .filter((record) => record.expiresAt === undefined || record.expiresAt > Date.now())
+        .filter((record) => query.embedding !== undefined || record.content.toLocaleLowerCase().includes(query.text.toLocaleLowerCase()))
+        .filter((record) => record.expiresAt === undefined || record.expiresAt > now)
         .filter((record) => query.tenantId === undefined || record.tenantId === query.tenantId)
         .filter((record) => query.ownerId === undefined || record.ownerId === query.ownerId)
         .filter((record) => query.namespace === undefined || record.namespace === query.namespace)

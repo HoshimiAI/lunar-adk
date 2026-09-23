@@ -36,7 +36,7 @@ function normalizeToolCalls(toolCalls: Array<{ toolCallId: string; toolName: str
 }
 
 function toAISDKMessages(messages: ModelCallOptions["messages"]): unknown[] {
-  return messages.map((message) => {
+  return messages.filter((message) => message.role !== "system").map((message) => {
     if (message.role === "tool") {
       return {
         role: "tool",
@@ -66,6 +66,14 @@ function toAISDKMessages(messages: ModelCallOptions["messages"]): unknown[] {
   });
 }
 
+function toSystemInstruction(options: ModelCallOptions): string | undefined {
+  const instructions = [options.system, ...options.messages
+    .filter((message) => message.role === "system")
+    .map((message) => message.content)]
+    .filter((instruction): instruction is string => Boolean(instruction?.trim()));
+  return instructions.length > 0 ? instructions.join("\n\n") : undefined;
+}
+
 export function createAISDKModelProvider(options: AISDKModelProviderOptions): ModelProvider {
   return {
     id: options.id,
@@ -73,7 +81,7 @@ export function createAISDKModelProvider(options: AISDKModelProviderOptions): Mo
     async call(callOptions): Promise<ModelResponse> {
       const result = await generateText({
         model: options.model,
-        system: callOptions.system,
+        system: toSystemInstruction(callOptions),
         messages: toAISDKMessages(callOptions.messages) as never,
         tools: toTools(callOptions),
         abortSignal: callOptions.signal,
@@ -91,7 +99,7 @@ export function createAISDKModelProvider(options: AISDKModelProviderOptions): Mo
     async *stream(callOptions): AsyncIterable<ModelStreamPart> {
       const result = streamText({
         model: options.model,
-        system: callOptions.system,
+        system: toSystemInstruction(callOptions),
         messages: toAISDKMessages(callOptions.messages) as never,
         tools: toTools(callOptions),
         abortSignal: callOptions.signal,

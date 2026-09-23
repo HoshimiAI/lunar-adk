@@ -30,6 +30,10 @@ const result = await runtime.approve(runId, approvalId);
 Call `runtime.reject(runId, approvalId)` to end the pending run without running
 the tool.
 
+For the Elysia API, inspect `GET /runs/:id` for `pendingApproval`, then send
+`POST /runs/:id/approve` or `POST /runs/:id/reject` with
+`{ "approvalId": "..." }`. The approval ID is separate from the run ID.
+
 ## Workflow approval
 
 ```ts
@@ -49,3 +53,10 @@ Run it with `runWorkflow()`. When it pauses, persist the workflow run ID and
 approval ID. Resume with `resumeWorkflow(workflowRunId, approvalId)` after the
 decision. Checkpoints and approved IDs prevent already completed work from
 being repeated.
+
+The Elysia routes are `POST /workflows/:name/run`,
+`GET /workflow-runs/:id`, `POST /workflow-runs/:id/resume` with an optional
+`approvalId`, and `POST /workflow-runs/:id/cancel`. A workflow run's
+`pendingApproval` is returned when it pauses. Protect approval endpoints with
+authentication and authorize the human decision in the application before
+calling these routes.

@@ -1,0 +1,80 @@
+---
+title: "Use case: Unknown Planet storage"
+description: Persist runs, sessions, and workflows in scoped PostgreSQL storage
+---
+
+Use `@lunar/storage-unknown-planet` when runs, sessions, and workflow state
+must survive process restarts in PostgreSQL while remaining scoped to a Planet
+tenant or workspace. The adapter uses PostgreSQL transactions and
+revision-aware writes; its storage bundle atomically saves a run with its
+session.
+
+## Create the storage bundle
+
+Create a Planet client with its PostgreSQL SQL capability, run the additive
+migration before serving traffic, and construct storage with the scope for the
+authenticated tenant:
+
+```ts
+import { createRuntime } from '@lunar/adk';
+import {
+  createUnknownPlanetStorage,
+  migrateUnknownPlanetStorage,
+} from '@lunar/storage-unknown-planet';
+
+await migrateUnknownPlanetStorage({ planet });
+const storage = createUnknownPlanetStorage({
+  planet,
+  scope: { tenantId: 'acme', workspaceId: 'support' },
+});
+const runtime = await createRuntime({ storage });
+```
+
+The `planet` value above is an initialized `Planet` instance configured with a
+PostgreSQL-backed SQL capability. The adapter applies the given scope to all
+storage operations and rejects records whose tenant does not match it. Build
+the storage bundle using the tenant authorized for the request; do not select
+a tenant from untrusted request input. The caller owns the Planet client and
+must close it after the runtime shuts down.
+
+## Configure the Elysia example
+
+The repository's Elysia app can create this adapter at startup:
+
+```sh
+STORAGE_PROVIDER=unknown-planet \
+DATABASE_URL=postgres://user:password@localhost:5432/lunar \
+PLANET_TENANT_ID=acme \
+OPENAI_API_KEY=... \
+bun run --cwd apps/elysia start
+```
+
+It runs the storage migration and scopes run, session, and workflow records to
+`PLANET_TENANT_ID` (default `lunar-local`). For a multi-tenant service, use
+application-managed per-tenant Planet scopes rather than sharing one fixed
+tenant environment value across all users. `DATABASE_URL` is also used by the
+optional PostgreSQL memory provider when `MEMORY_PROVIDER=postgres`; memory is
+a separate capability and storage adapter.
+
+## Verify persistence over HTTP
+
+With the app running, check readiness, then create and inspect a run:
+
+```sh
+curl http://localhost:3000/readyz
+curl -X POST http://localhost:3000/run \
+  -H 'content-type: application/json' \
+  -d '{"input":"Reply with unknown-planet-live-ok"}'
+curl http://localhost:3000/runs/RUN_ID
+curl http://localhost:3000/sessions/SESSION_ID
+```
+
+Use the returned session ID in a later `POST /run` request to continue the
+conversation. The HTTP API's remaining run, session, workflow, and memory
+routes are listed in the [HTTP reference](/docs/reference/http-api).
+
+The migration creates `lunar.runs`, `lunar.sessions`, and
+`lunar.workflow_runs`; it is safe to rerun. Keep those tables when rolling
+back application code. Dropping them deletes durable application data and is a
+separate operator decision. For an isolated local database and authenticated
+live test harness, follow the [adapter README](https://github.com/HoshimiAI/lunar-adk/blob/main/packages/storage-unknown-planet/README.md).

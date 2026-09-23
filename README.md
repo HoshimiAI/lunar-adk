@@ -14,6 +14,7 @@ Release status: v1.2 code-first workflows and managed subagents.
 - [`packages/storage-http`](packages/storage-http) — `@lunar/storage-http`, remote HTTP run, session, and workflow storage.
 - [`packages/storage-bun-sql`](packages/storage-bun-sql) — `@lunar/storage-bun-sql`, Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
 - [`packages/storage-mongo`](packages/storage-mongo) — `@lunar/storage-mongo`, MongoDB collection adapter using an application-provided Mongo SDK client.
+- [`packages/storage-unknown-planet`](packages/storage-unknown-planet) — `@lunar/storage-unknown-planet`, run/session/workflow storage and scoped memory for Unknown Planet.
 - [`packages/memory-sqlite`](packages/memory-sqlite) — `@lunar/memory-sqlite`, durable SQLite memory records.
 - [`packages/observability-otel`](packages/observability-otel) — `@lunar/observability-otel`, console and OTLP telemetry exporters.
 - [`apps/elysia`](apps/elysia) — API-only Elysia HTTP adapter and runnable application.
@@ -116,7 +117,9 @@ finish once, interrupts before the next model turn, and returns `202` with the
 interrupted and continuation run IDs. Active streaming responses emit a
 `stream.interrupted` event before closing; the continuation is a separate run.
 
-Memory search and authentication remain deferred for later releases.
+Authenticated memory management supports creation, text upload, owner-scoped
+listing, search, and deletion. Search uses an embedding provider when configured
+and otherwise uses the memory provider's text search.
 
 Approval-required tools pause a run with `status: "waiting_approval"`. Approve or reject the pending request with `POST /runs/<run-id>/approve` or `POST /runs/<run-id>/reject`, passing the returned `approvalId`. Active runs can be cancelled with `POST /runs/<run-id>/cancel`.
 

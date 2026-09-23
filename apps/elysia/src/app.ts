@@ -1,11 +1,14 @@
 import { Elysia, t } from "elysia";
+import { SQL } from "bun";
+import { Planet, type SqlStore } from "@unknown-planet/sdk";
 import { AgentRunError, StorageConflictError, createRuntime, defineAgent } from "@lunar/adk";
-import type { AuthPrincipal, AuthProvider, EmbeddingProvider, Run, RuntimeHandle, RuntimeStreamEvent, Session } from "@lunar/adk";
+import type { AgentConfig, AuthPrincipal, AuthProvider, EmbeddingProvider, Run, RuntimeHandle, RuntimeStreamEvent, Session } from "@lunar/adk";
 import { createOpenAIEmbeddingProvider, createOpenAIModelProvider } from "@lunar/provider-openai";
 import { createSqliteStores } from "@lunar/storage-sqlite";
 import { createHttpStores } from "@lunar/storage-http";
 import { createBunSqlStores, type BunSqlDialect } from "@lunar/storage-bun-sql";
 import { createBunSqlMemoryProvider } from "@lunar/memory-bun-sql";
+import { createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar/storage-unknown-planet";
 import { createBetterAuthProvider, type BetterAuthLike, type BetterAuthSession } from "@lunar/auth-better-auth";
 import { createConsoleExporter, createOTLPExporter } from "@lunar/observability-otel";
 import { elysiaTools } from "./tools";
@@ -97,6 +100,10 @@ export interface AppOptions {
   };
   /** Provide a shared atomic store when multiple app instances must share quotas. */
   rateLimitStore?: RateLimitStore;
+  /** Register app-specific agents, workflows, and plugins before serving requests. */
+  configureRuntime?: (runtime: RuntimeHandle) => void | Promise<void>;
+  /** Add tools to the default assistant. */
+  agentTools?: NonNullable<AgentConfig["tools"]>;
 }
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -217,7 +224,10 @@ function createRateLimiter(config: AppOptions["rateLimit"], store?: RateLimitSto
 
 export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}) {
   const sessionAllowed = async (sessionId: string | undefined, principal: AuthPrincipal | undefined) => !sessionId || belongsToPrincipal(await runtime.getSession(sessionId), principal);
-  const runAllowed = async (runId: string, principal: AuthPrincipal | undefined) => belongsToPrincipal(await runtime.getStoredRun(runId), principal);
+  const runAllowed = async (runId: string, principal: AuthPrincipal | undefined) => {
+    const run = runtime.getRun(runId) ?? await runtime.getStoredRun(runId);
+    return belongsToPrincipal(run, principal);
+  };
   const workflowAllowed = async (runId: string, principal: AuthPrincipal | undefined) => belongsToPrincipal(await runtime.getWorkflowRun(runId), principal);
   const rateLimiter = createRateLimiter(options.rateLimit, options.rateLimitStore);
   const app = new Elysia();
@@ -489,6 +499,21 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
       if (!provider?.list) { set.status = 404; return { error: "Memory listing is not configured" }; }
       return provider.list({ tenantId: principal!.tenantId, ownerId: principal!.subjectId, namespace: query.namespace, cursor: query.cursor, limit: query.limit ? Number(query.limit) : undefined });
     }, { query: t.Object({ namespace: t.Optional(t.String()), cursor: t.Optional(t.String()), limit: t.Optional(t.String()) }) })
+    .post("/memories/search", async ({ body, principal, set }) => {
+      if (!can(principal, "memory:read")) { set.status = 403; return { error: "Forbidden" }; }
+      const provider = runtime.getMemoryProvider();
+      if (!provider) { set.status = 404; return { error: "Memory is not configured" }; }
+      const embedding = options.embedding ? await options.embedding.embed(body.text) : undefined;
+      const records = await provider.retrieve({
+        text: body.text,
+        tenantId: principal!.tenantId,
+        ownerId: principal!.subjectId,
+        namespace: body.namespace,
+        limit: body.limit,
+        ...(embedding ? { embedding } : {}),
+      });
+      return { records };
+    }, { body: t.Object({ text: t.String({ minLength: 1, maxLength: 4_000 }), namespace: t.Optional(t.String()), limit: t.Optional(t.Number({ minimum: 1, maximum: 100 })) }) })
     .delete("/memories/:id", async ({ params, principal, set }) => {
       if (!can(principal, "memory:delete")) { set.status = 403; return { error: "Forbidden" }; }
       const removed = await runtime.getMemoryProvider()?.delete?.(params.id, principal!.tenantId, principal!.subjectId);
@@ -578,10 +603,31 @@ export async function createDefaultApp(options: AppOptions = {}) {
   }
 
   const storageProvider = process.env.STORAGE_PROVIDER ?? "sqlite";
-  if (!["sqlite", "postgres", "mysql", "http"].includes(storageProvider)) {
+  if (!["sqlite", "postgres", "mysql", "http", "unknown-planet"].includes(storageProvider)) {
     throw new Error(`Unsupported STORAGE_PROVIDER: ${storageProvider}`);
   }
-  const storage = storageProvider === "http"
+  let planetClient: SQL | undefined;
+  const storage = storageProvider === "unknown-planet"
+    ? await (async () => {
+        const databaseUrl = process.env.DATABASE_URL ?? (() => { throw new Error("DATABASE_URL is required when STORAGE_PROVIDER=unknown-planet"); })();
+        planetClient = new SQL(databaseUrl);
+        const sqlStore: SqlStore = {
+          async query<T extends Record<string, unknown> = Record<string, unknown>>(input: Parameters<SqlStore["query"]>[0]) {
+            const rows = await planetClient!.unsafe(input.text, [...(input.values ?? [])]);
+            return { rows: rows as T[], rowCount: rows.length };
+          },
+          transaction: (work) => planetClient!.begin((transaction) => work({
+            async query<T extends Record<string, unknown> = Record<string, unknown>>(input: Parameters<SqlStore["query"]>[0]) {
+              const rows = await transaction.unsafe(input.text, [...(input.values ?? [])]);
+              return { rows: rows as T[], rowCount: rows.length };
+            },
+          })),
+        };
+        const planet = new Planet({ sql: sqlStore });
+        await migrateUnknownPlanetStorage({ planet });
+        return createUnknownPlanetStorage({ planet, scope: { tenantId: process.env.PLANET_TENANT_ID ?? "lunar-local" } });
+      })()
+    : storageProvider === "http"
     ? createHttpStores({
         baseUrl: process.env.STORAGE_HTTP_BASE_URL ?? (() => { throw new Error("STORAGE_HTTP_BASE_URL is required when STORAGE_PROVIDER=http"); })(),
         token: process.env.STORAGE_HTTP_TOKEN,
@@ -628,12 +674,13 @@ export async function createDefaultApp(options: AppOptions = {}) {
         apiKey,
       }),
       systemPrompt: "You are a helpful assistant. Use current_time for the current UTC time and calculate for arithmetic instead of guessing.",
-      tools: elysiaTools,
+      tools: [...elysiaTools, ...(options.agentTools ?? [])],
       ...(memoryProvider ? { memory: { providerId: memoryProvider.id, namespace: process.env.MEMORY_NAMESPACE ?? "assistant", retrieveLimit: Number(process.env.MEMORY_RETRIEVE_LIMIT ?? 5), store: "none" as const } } : {}),
     }),
   );
+  await options.configureRuntime?.(runtime);
 
-  return (await createApp(runtime, {
+  const app = await createApp(runtime, {
     ...options,
     rateLimit,
     embedding: options.embedding ?? embedding,
@@ -641,7 +688,9 @@ export async function createDefaultApp(options: AppOptions = {}) {
       await storage.health?.();
       await memoryProvider?.health();
     },
-  })).onStop(async () => {
+  });
+  return app.onStop(async () => {
     await runtime.shutdown?.();
+    await planetClient?.close();
   });
 }

@@ -86,6 +86,19 @@ Creates the same storage bundle using Bun.SQL. Supported dialects are
 `sqlite`, `postgres`, and `mysql`; MariaDB uses the MySQL dialect. The
 `connection` can be a Bun SQL connection URL or an existing `SQL` client.
 
+## `createUnknownPlanetStorage(options)`
+
+Package: `@lunar/storage-unknown-planet`
+
+Creates a revision-aware `StorageBundle` from an initialized Unknown Planet
+`Planet` client and a required `scope.tenantId` (plus optional
+`scope.workspaceId`). It persists runs, sessions, and workflow runs in the
+`lunar` schema, declares optimistic concurrency and atomic run/session writes,
+and supports workflow recovery listing. Call `migrateUnknownPlanetStorage()`
+before serving requests. The caller owns the Planet client and connection.
+This adapter requires SQL transactions; it does not automatically configure
+the Elysia app's separate `MemoryProvider`.
+
 ## `createMongoStores(options)`
 
 Package: `@lunar/storage-mongo`

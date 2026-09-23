@@ -7,9 +7,13 @@ The Elysia example requires `OPENAI_API_KEY`. `OPENAI_MODEL` defaults to
 `gpt-5-mini`, and `PORT` defaults to `3000`.
 
 Storage defaults to local SQLite at `lunar.db`. Set `STORAGE_PROVIDER` to
-`http`, `postgres`, or `mysql` to select another adapter. HTTP storage requires
-`STORAGE_HTTP_BASE_URL` and optionally accepts `STORAGE_HTTP_TOKEN`. PostgreSQL
-and MySQL require `DATABASE_URL`.
+`http`, `postgres`, `mysql`, or `unknown-planet` to select another adapter.
+HTTP storage requires `STORAGE_HTTP_BASE_URL` and optionally accepts
+`STORAGE_HTTP_TOKEN`. PostgreSQL, MySQL, and Unknown Planet storage require
+`DATABASE_URL`. Unknown Planet storage runs its schema migration on startup
+and uses `PLANET_TENANT_ID` as its scope (default `lunar-local`). See
+[the Unknown Planet use case](/docs/use-cases/unknown-planet); the app expects
+a PostgreSQL SQL capability with transaction support.
 
 Set `LUNAR_TELEMETRY=console` for console telemetry. Set
 `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) for
@@ -18,8 +22,10 @@ disabled unless `LUNAR_TELEMETRY_CAPTURE_CONTENT=true`.
 
 ## Production memory
 
-Set `MEMORY_PROVIDER=postgres` to enable curated PostgreSQL memory. It uses
+Set `MEMORY_PROVIDER=postgres` to enable PostgreSQL memory. It uses
 `MEMORY_DATABASE_URL`, falling back to `DATABASE_URL`; `MEMORY_NAMESPACE`
-defaults to `assistant`, and `MEMORY_RETRIEVE_LIMIT` defaults to `5`.
+defaults to `assistant`, and `MEMORY_RETRIEVE_LIMIT` defaults to `5`. Memory
+is a separate provider; selecting `STORAGE_PROVIDER=unknown-planet` does not
+configure Planet's native memory capability for the Elysia API.
 Production memory retrieval is read-only for the example agent. Operators add
 facts through the authenticated memory API with an explicit expiry time.

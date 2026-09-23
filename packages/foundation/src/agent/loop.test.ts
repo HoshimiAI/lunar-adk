@@ -347,7 +347,7 @@ describe("foundation runtime", () => {
     const runtime = await createRuntime();
     runtime.registerAgent(defineAgent({ name: "assistant", model }));
     sessionId = "steering-session";
-    const pending = runtime.run("assistant", "first", { sessionId });
+    const pending = runtime.run("assistant", "first", { sessionId, tenantId: "tenant-one", ownerId: "owner-one" });
     while (calls === 0) await new Promise((resolve) => setTimeout(resolve, 0));
 
     const steering = await runtime.steer(sessionId, "Use a concise answer.");
@@ -363,6 +363,8 @@ describe("foundation runtime", () => {
 
     expect(continuation.status).toBe("completed");
     expect(continuation.parentRunId).toBe(steering.interruptedRunId);
+    expect(continuation.tenantId).toBe("tenant-one");
+    expect(continuation.ownerId).toBe("owner-one");
     expect(prompts[1]).toContain("system:Use a concise answer.");
   });
 

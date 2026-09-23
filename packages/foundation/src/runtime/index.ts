@@ -2,7 +2,7 @@ import { resolveConfig } from "./config";
 import { bootstrap } from "./bootstrap";
 import type { AgentRunResult } from "../agent";
 import { AgentRunError } from "../agent";
-import { appendEvent, cancelRun, createRun, failRun, type Run } from "../run";
+import { appendEvent, cancelRun, createRun, failRun, startRun, type Run } from "../run";
 import { InMemoryRunStore } from "../run";
 import { upsertRun, appendMessage, createSession, InMemorySessionStore, normalizeSession } from "../session";
 import type { Session } from "../session";
@@ -13,6 +13,7 @@ import type { RunContinuation } from "../run";
 import { WorkflowApprovalRequired } from "../workflow";
 import { ObservabilityHub } from "../observability";
 import { createPolicyEnforcer } from "../policy";
+import { StorageConflictError } from "../storage";
 
 export type { RuntimeConfig, RuntimeHandle, SteeringResult } from "./types";
 export type { RuntimeStreamEvent } from "./types";
@@ -55,7 +56,11 @@ class AsyncQueue<T> implements AsyncIterable<T> {
 interface ActiveRun {
   controller: AbortController;
   promise: Promise<AgentRunResult>;
+  settled: Promise<void>;
+  run: Run<string>;
   sessionId: string;
+  tenantId?: string;
+  ownerId?: string;
   agentName: string;
   input: string;
   continuation?: RunContinuation;
@@ -190,10 +195,16 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     const sessionForRun = options.continuation
       ? session
       : appendMessage(session, { role: "user", content: input });
+    let settleActive!: () => void;
+    const settled = new Promise<void>((resolve) => { settleActive = resolve; });
     const active: ActiveRun = {
       controller,
       promise: undefined as never,
+      settled,
+      run: startRun(seed),
       sessionId: session.id,
+      tenantId: options.tenantId ?? session.tenantId,
+      ownerId: options.ownerId ?? session.ownerId,
       agentName,
       input,
       onSteered: options.onSteered,
@@ -244,6 +255,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     } finally {
       options.signal?.removeEventListener("abort", abortFromCaller);
       activeRuns.delete(seed.id);
+      settleActive();
     }
   }
 
@@ -433,17 +445,32 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           model: activeAgent.modelId,
           sessionId,
           parentRunId: interruptedRunId,
+          tenantId: active.tenantId,
+          ownerId: active.ownerId,
         });
         const continuationRunId = continuationSeed.id;
         active.onSteered?.({ sessionId, interruptedRunId, continuationRunId });
         void (async () => {
           active.controller.abort("steered");
-          await active.promise.catch(() => undefined);
+          await active.settled;
           await withSessionLock(sessionId, async () => {
-            const session = normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId });
+            let session = normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(active.tenantId, active.ownerId), id: sessionId });
             const interrupted = await runStore.get(interruptedRunId);
-            const steered = appendMessage(session, { role: "system", content });
-            await sessionStore.save(steered, { expectedRevision: session.revision });
+            let steered: Session | undefined;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              steered = session.history.at(-1)?.role === "system" && session.history.at(-1)?.content === content
+                ? session
+                : appendMessage(session, { role: "system", content });
+              if (steered === session) break;
+              try {
+                steered = await sessionStore.save(steered, { expectedRevision: session.revision });
+                break;
+              } catch (error) {
+                if (!(error instanceof StorageConflictError) || attempt === 2) throw error;
+                session = normalizeSession((await sessionStore.get(sessionId)) ?? session);
+              }
+            }
+            if (!steered) throw new Error("Failed to save the steering instruction");
             const captured = active.continuation ?? {
               input: active.input,
               messages: session.history,
@@ -458,6 +485,8 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
             };
             await executeAgent(active.agentName, active.input, steered, {
               sessionId,
+              tenantId: active.tenantId,
+              ownerId: active.ownerId,
               continuation,
               initialRun: continuationSeed,
               parentRunId: interrupted?.id ?? interruptedRunId,
@@ -523,7 +552,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       const active = activeRuns.get(runId);
       if (active) {
         active.controller.abort();
-        await active.promise.catch(() => undefined);
+        await active.settled;
         return (await runStore.get(runId)) ?? runs.get(runId);
       }
       const storedRun = await runStore.get(runId);
@@ -540,7 +569,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       });
     },
 
-    getRun: (runId) => runs.get(runId),
+    getRun: (runId) => activeRuns.get(runId)?.run ?? runs.get(runId),
     getStoredRun: (runId) => runStore.get(runId),
     getSession: async (sessionId) => {
       const session = await sessionStore.get(sessionId);

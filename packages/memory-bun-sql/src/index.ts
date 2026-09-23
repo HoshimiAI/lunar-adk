@@ -78,7 +78,7 @@ export async function createBunSqlMemoryProvider(options: BunSqlMemoryOptions): 
   };
   return {
     id: options.id ?? "postgres",
-    capabilities: { metadataFiltering: true, namespaces: true, deletion: true },
+    capabilities: { semanticSearch: true, metadataFiltering: true, namespaces: true, deletion: true },
     client,
     async store(input) {
       const tenantId = requireTenant(input.tenantId);

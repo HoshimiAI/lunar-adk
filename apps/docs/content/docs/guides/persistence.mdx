@@ -1,6 +1,6 @@
 ---
 title: Persistence
-description: Store runs, sessions, and workflow state in SQLite
+description: Store runs, sessions, and workflow state across storage adapters
 ---
 
 The runtime uses in-memory stores by default. For a Bun service, use
@@ -80,13 +80,33 @@ const runtime = await createRuntime({
 });
 ```
 
-The HTTP provider is intentionally generic so a future Unknown Planet service
-can implement the same storage contract.
+The HTTP provider is intentionally generic so a remote storage service can
+implement the same storage contract.
 
 For SQL deployments, `@lunar/storage-bun-sql` supports SQLite, PostgreSQL,
 MySQL, and MariaDB through Bun.SQL. For MongoDB, pass a database handle from
-the official MongoDB SDK to `createMongoStores()`. Unknown Planet can expose a
-separate SDK adapter in its own repository using `StorageBundle`.
+the official MongoDB SDK to `createMongoStores()`. For Unknown Planet, use
+`@lunar/storage-unknown-planet` with a `Planet` client configured with a
+PostgreSQL SQL capability. Run `migrateUnknownPlanetStorage()` before serving
+traffic:
+
+```ts
+import { createRuntime } from '@lunar/adk';
+import { createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from '@lunar/storage-unknown-planet';
+
+await migrateUnknownPlanetStorage({ planet });
+const scope = { tenantId: 'acme', workspaceId: 'research' };
+const storage = createUnknownPlanetStorage({ planet, scope });
+const memory = createUnknownPlanetMemoryProvider({ planet, scope });
+const runtime = await createRuntime({ storage, memory });
+```
+
+The storage adapter uses Planet's scoped SQL capability. The optional memory
+adapter uses Planet's memory capability and can use vector search when the
+Planet client and embedding provider are configured for it. The caller owns
+the Planet client and its database connection. The Elysia reference service
+currently uses its PostgreSQL memory provider for the HTTP memory routes; see
+[configuration](/docs/configuration).
 
 For production PostgreSQL memory, use `@lunar/memory-bun-sql`. It stores
 tenant-scoped curated facts with mandatory expiry and uses PostgreSQL full-text

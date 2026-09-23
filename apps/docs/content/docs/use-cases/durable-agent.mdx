@@ -13,11 +13,7 @@ long-running work resumable.
 
 ```ts
 const storage = createSqliteStores('lunar.db');
-const runtime = await createRuntime({
-  runStore: storage.runStore,
-  sessionStore: storage.sessionStore,
-  workflowStore: storage.workflowStore,
-});
+const runtime = await createRuntime({ storage, ownsStorage: true });
 ```
 
 Use normal agent runs for conversational turns. Use workflows for jobs that
@@ -38,8 +34,15 @@ runtime.registerWorkflow(defineWorkflow({
 }));
 ```
 
-On restart, load the workflow run by ID and call `resumeWorkflow()`. The
-latest checkpoint is exposed as `ctx.resumeFrom`; workflow code should use it
-to make completed stages idempotent. Store external side effects with their
-own idempotency key because SQLite persistence alone cannot undo an external
-operation.
+On restart, register the same workflow and call `runtime.recoverWorkflows()`
+or load the workflow run by ID and call `resumeWorkflow()`. In the Elysia
+service, `recoverWorkflowsOnStartup: true` resumes persisted runs with status
+`running` before the app begins serving. Waiting-for-approval runs remain
+paused. The latest checkpoint is exposed as `ctx.resumeFrom`; workflow code
+should use it to avoid repeating completed stages. Give external side effects
+their own idempotency keys because storage cannot undo an external operation.
+
+Use a shared database adapter when deploying multiple service replicas so each
+instance can load the same workflow, checkpoint, and session state. The
+[Unknown Planet use case](/docs/use-cases/unknown-planet) shows the PostgreSQL
+integration; other choices are listed in [persistence](/docs/guides/persistence).
