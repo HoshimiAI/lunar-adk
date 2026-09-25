@@ -40,8 +40,18 @@ const waitTool = defineTool<Record<string, never>, string>({
     parse: () => ({}),
     toJSONSchema: () => ({ type: "object", properties: {}, additionalProperties: false }),
   },
-  execute: async () => {
-    await new Promise((resolve) => setTimeout(resolve, 35_000));
+  execute: async (_input, { signal } = {}) => {
+    await new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+        return;
+      }
+      const timer = setTimeout(resolve, 35_000);
+      signal?.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      }, { once: true });
+    });
     return "Wait completed.";
   },
 });

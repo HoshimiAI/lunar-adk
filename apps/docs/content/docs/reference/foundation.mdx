@@ -13,6 +13,9 @@ Package: `@lunar/foundation/agent`
 
 - `defineAgent(config, eventBus?)` creates an `Agent` from a model, prompt,
   tools, retry policy, and context limits.
+- `AgentHooks` describes the async `beforeModel`, `afterModel`, `beforeTool`,
+  and `afterTool` observers configured on an agent. Hooks are awaited, cannot
+  replace execution values, and a thrown error fails the run.
 - `runSubAgent(agent, input, options?)` executes an agent as a child run.
 - `withRetry(operation, policy?)` retries an async operation according to a
   retry policy; `defaultRetryPolicy` provides the default policy.

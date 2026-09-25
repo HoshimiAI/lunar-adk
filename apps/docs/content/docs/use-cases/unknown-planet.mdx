@@ -37,6 +37,37 @@ the storage bundle using the tenant authorized for the request; do not select
 a tenant from untrusted request input. The caller owns the Planet client and
 must close it after the runtime shuts down.
 
+## Embedding ownership
+
+When `MEMORY_PROVIDER=unknown-planet`, configure embeddings on the Planet
+client itself. The adapter passes raw memory content to `planet.memory.add()`
+and raw search text to `planet.memory.search()`. Planet's `PlanetConfig.embeddings`
+provider creates vectors using its configured model and dimensions. Lunar ADK's
+embedding provider remains independent and does not configure Planet.
+
+For example, the OpenAI-compatible provider is configured when constructing
+Planet alongside the PostgreSQL provider:
+
+```ts
+const dimensions = 1536;
+const model = 'text-embedding-3-small';
+const planet = new Planet({
+  providers: [createPostgresProvider({
+    database: pool,
+    vectorCollections: { memory: { dimensions, model }, node: { dimensions, model } },
+  })],
+  routing: { memories: 'postgres', vector: 'postgres', graph: 'postgres' },
+  embeddings: new OpenAICompatibleEmbeddingProvider({
+    apiKey: process.env.OPENAI_API_KEY!, model, dimensions,
+  }),
+});
+```
+
+Apply Unknown Planet's PostgreSQL migrations with pgvector enabled. Keep the
+embedding provider's model and dimensions aligned with each vector collection.
+Lunar may use its own embedding provider for ADK-native memory; configuring it
+does not implicitly configure this Planet client.
+
 ## Configure the Elysia example
 
 The repository's Elysia app can create this adapter at startup:

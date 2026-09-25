@@ -17,6 +17,13 @@ verify the incoming request and return a principal with a tenant ID and
 permissions. Lunar scopes runs, sessions, workflow runs, and memories to that
 tenant. Do not derive a tenant from an unverified request header.
 
+`createDefaultApp()` requires an `AuthProvider` unless the caller explicitly
+sets `allowUnauthenticated: true`. The packaged server accepts that opt-in
+through `LUNAR_ALLOW_UNAUTHENTICATED=true` and binds to `127.0.0.1` by default.
+Use an authenticated app when exposing the service through a public listener
+or reverse proxy. HTTP run and workflow responses redact internal failure
+messages; the runtime and persisted records retain them for operators.
+
 `@lunar/auth-better-auth` provides `createBetterAuthProvider()` for Better Auth
 sessions. The application maps a verified Better Auth user/session to Lunar's
 tenant and permission model. Curated memory endpoints require `memory:read`,

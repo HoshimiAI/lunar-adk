@@ -8,7 +8,7 @@ export { defaultRetryPolicy, withRetry } from "./retry";
 export { AgentRunError } from "./errors";
 export { createCancellation, throwIfAborted } from "./cancellation";
 export { canTransition } from "./state";
-export type { Agent, AgentConfig, AgentMemoryConfig, AgentRunOptions, AgentRunResult, AgentState } from "./types";
+export type { Agent, AgentConfig, AgentHooks, AgentMemoryConfig, AgentRunOptions, AgentRunResult, AgentState } from "./types";
 export type { AgentErrorCode } from "./errors";
 
 export function defineAgent(config: AgentConfig, bus: EventBus = new EventBus()): Agent {

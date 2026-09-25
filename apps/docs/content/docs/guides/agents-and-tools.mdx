@@ -37,15 +37,36 @@ runtime.registerAgent(defineAgent({
 }));
 ```
 
-The agent API supports system prompts, tool
-round-trip limits, retry policies, context budgets, cancellation, and
-streaming callbacks.
+The agent API supports system prompts, tool round-trip limits, retry policies,
+context budgets, cancellation, and streaming callbacks. Add lifecycle hooks to
+observe each model and tool interaction:
+
+```ts
+runtime.registerAgent(defineAgent({
+  name: 'assistant',
+  model: createOpenAIModelProvider({ model: 'gpt-5-mini' }),
+  tools: [calculator],
+  hooks: {
+    beforeModel: ({ runId, round }) => audit({ runId, action: 'model', round }),
+    afterModel: ({ runId, response }) => audit({ runId, text: response.text }),
+    beforeTool: ({ runId, toolCall }) => audit({ runId, tool: toolCall.name }),
+    afterTool: ({ runId, toolCall, result }) => audit({ runId, tool: toolCall.name, result }),
+  },
+}));
+```
+
+Hooks may be async and are awaited in lifecycle order. They observe the
+execution; they cannot replace model options, responses, tool calls, or results.
+If a hook throws, the run fails with that error. `beforeTool` runs when the tool
+is about to execute, after any required approval is granted.
 
 ## Tools
 
 Tools are explicit capabilities. Each tool has a name, description, schema, and
 executor. The schema must validate input and expose `toJSONSchema()` so model
-providers can advertise the tool to the model.
+providers can advertise the tool to the model. The executor may accept a
+second context argument with an `AbortSignal`; pass it to cancellable I/O so
+active run cancellation and steering can stop the operation promptly.
 
 Set `permission: { requiresApproval: true }` for side effects that require a
 user decision. An approved tool call resumes the same run with its pending

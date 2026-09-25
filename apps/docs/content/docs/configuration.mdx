@@ -4,7 +4,9 @@ description: Configure the Elysia example service
 ---
 
 The Elysia example requires `OPENAI_API_KEY`. `OPENAI_MODEL` defaults to
-`gpt-5-mini`, and `PORT` defaults to `3000`.
+`gpt-5-mini`, and `PORT` defaults to `3000`. Lunar ADK's own embedding
+provider uses `OPENAI_EMBEDDING_MODEL` (default `text-embedding-3-small`) and
+optional `OPENAI_EMBEDDING_DIMENSIONS`. These settings configure ADK only.
 
 Storage defaults to local SQLite at `lunar.db`. Set `STORAGE_PROVIDER` to
 `http`, `postgres`, `mysql`, or `unknown-planet` to select another adapter.
@@ -25,7 +27,53 @@ disabled unless `LUNAR_TELEMETRY_CAPTURE_CONTENT=true`.
 Set `MEMORY_PROVIDER=postgres` to enable PostgreSQL memory. It uses
 `MEMORY_DATABASE_URL`, falling back to `DATABASE_URL`; `MEMORY_NAMESPACE`
 defaults to `assistant`, and `MEMORY_RETRIEVE_LIMIT` defaults to `5`. Memory
-is a separate provider; selecting `STORAGE_PROVIDER=unknown-planet` does not
-configure Planet's native memory capability for the Elysia API.
+is configured separately from run/session storage.
 Production memory retrieval is read-only for the example agent. Operators add
 facts through the authenticated memory API with an explicit expiry time.
+
+Set `MEMORY_PROVIDER=unknown-planet` to use Lunar's Unknown Planet memory
+adapter. Pass a Planet client configured with a memory store, vector store,
+graph store, and its own embedding provider. The PostgreSQL provider supplies
+these stores; Planet's `embeddings` setting owns embedding for content ingested
+through Planet:
+
+```ts
+import { createPostgresProvider } from '@unknown-planet/postgres';
+import { OpenAICompatibleEmbeddingProvider, Planet } from '@unknown-planet/sdk';
+
+const dimensions = 1536;
+const model = 'text-embedding-3-small';
+const planet = new Planet({
+  providers: [createPostgresProvider({
+    database: pool,
+    vectorCollections: {
+      memory: { dimensions, model },
+      node: { dimensions, model },
+    },
+  })],
+  routing: { memories: 'postgres', vector: 'postgres', graph: 'postgres' },
+  embeddings: new OpenAICompatibleEmbeddingProvider({
+    apiKey: process.env.OPENAI_API_KEY!,
+    model,
+    dimensions,
+  }),
+});
+
+const app = await createDefaultApp({
+  auth: authProvider,
+  unknownPlanet: { planet, scope: { tenantId: 'acme' } },
+});
+```
+
+If `STORAGE_PROVIDER=unknown-planet` is also selected, that Planet client must
+also have a PostgreSQL SQL capability. Planet's PostgreSQL migrations must be
+applied and the pgvector extension enabled before ingestion. The vector
+collection model and dimensions must match Planet's embedding provider.
+
+The Elysia app's `embedding` option configures Lunar ADK's native memory and
+retrieval features. It does not configure `planet` or get forwarded to
+Unknown Planet. The Unknown Planet memory adapter sends raw memory content to
+`planet.memory.add()` and lets Planet embed/index it; it likewise delegates
+semantic memory queries to `planet.memory.search()`. Sharing a provider
+instance is optional, but keep model and dimensions compatible when both
+systems embed related content.

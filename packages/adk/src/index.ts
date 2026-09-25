@@ -10,6 +10,7 @@ export { AgentRunError, defineAgent } from "@lunar/foundation/agent";
 export type {
   Agent,
   AgentConfig,
+  AgentHooks,
   AgentMemoryConfig,
   AgentRunOptions,
   AgentRunResult,
@@ -18,7 +19,7 @@ export type {
 } from "@lunar/foundation/agent";
 
 export { defineTool } from "@lunar/foundation/tool";
-export type { Tool, ToolResult, ToolPermission } from "@lunar/foundation/tool";
+export type { Tool, ToolResult, ToolPermission, ToolExecutionContext } from "@lunar/foundation/tool";
 
 export { defineModelProvider } from "@lunar/foundation/model";
 export type {

@@ -161,7 +161,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       try {
         const memories = await memoryProvider.retrieve({
           text: input,
-          ...(config.embedding ? { embedding: await config.embedding.embed(input) } : {}),
+          ...(config.embedding && memoryProvider.capabilities?.embeddingOwner !== "provider" ? { embedding: await config.embedding.embed(input) } : {}),
           limit: agent.memory?.retrieveLimit ?? 5,
           namespace: agent.memory?.namespace,
           filter: agent.memory?.filter,

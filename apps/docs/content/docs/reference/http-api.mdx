@@ -14,8 +14,10 @@ The adapter exports two factories:
 
 - `createApp(runtime)` builds the Elysia app around an existing
   `RuntimeHandle`, which is useful for tests and custom deployments.
-- `createDefaultApp()` creates SQLite storage, configures the OpenAI assistant,
-  installs the example tools, and closes storage from the app shutdown hook.
+- `createDefaultApp(options?)` creates the configured storage, sets up the
+  OpenAI assistant and example tools, and closes resources it owns. Pass
+  `unknownPlanet: { planet, scope }` with a Planet client configured for the
+  capabilities selected by `STORAGE_PROVIDER` and `MEMORY_PROVIDER`.
 - `createAppWithBetterAuth(runtime, options)` mounts a Better Auth handler and
   adapts its session to a Lunar principal through `mapPrincipal`.
 

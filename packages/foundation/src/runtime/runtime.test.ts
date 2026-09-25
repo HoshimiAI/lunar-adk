@@ -259,6 +259,31 @@ test("retrieves embedded memory semantically when an embedding provider is confi
   expect(receivedHistory).toContain("The forecast is sunny");
 });
 
+test("does not call Lunar embeddings when the memory provider owns embedding", async () => {
+  let embeddingCalls = 0;
+  let receivedEmbedding: number[] | undefined;
+  const provider: MemoryProvider = {
+    id: "planet-memory",
+    capabilities: { semanticSearch: true, embeddingOwner: "provider" },
+    async store(input) { return { ...input, id: "stored", createdAt: Date.now() }; },
+    async retrieve(query) { receivedEmbedding = query.embedding; return []; },
+  };
+  const runtime = await createRuntime({
+    memory: provider,
+    embedding: { id: "adk-embedding", async embed() { embeddingCalls += 1; return [1, 0]; } },
+  });
+  runtime.registerAgent(defineAgent({
+    name: "assistant",
+    model: { id: "model", capabilities: {}, async call() { return { text: "ok", toolCalls: [] }; } },
+    memory: { providerId: provider.id, store: "none" },
+  }));
+
+  await runtime.run("assistant", "hello");
+
+  expect(embeddingCalls).toBe(0);
+  expect(receivedEmbedding).toBeUndefined();
+});
+
 test("rejects duplicate memory provider IDs", () => {
   const registry = new MemoryRegistry();
   registry.register(createInMemoryProvider("duplicate"));

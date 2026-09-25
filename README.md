@@ -40,10 +40,12 @@ dependencies. Live checks require an explicitly provided restricted API key:
 ## Run the Elysia app
 
 ```bash
-bun --cwd apps/elysia run dev
+LUNAR_ALLOW_UNAUTHENTICATED=true bun --cwd apps/elysia run dev
 ```
 
-The service is API-only. Health checks are available at `GET /health`.
+The service is API-only and listens on `127.0.0.1` by default. Health checks
+are available at `GET /health`. Public deployments must pass an `AuthProvider`
+to `createDefaultApp()`; the unauthenticated setting is an explicit local opt-in.
 
 The Elysia assistant includes safe `current_time` and `calculate` tools. Try
 asking “What time is it in UTC?” or “Calculate (18 + 6) / 3.”

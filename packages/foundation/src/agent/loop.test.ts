@@ -326,6 +326,53 @@ describe("foundation runtime", () => {
     await expect(pending).rejects.toMatchObject({ code: "CANCELLED" });
   });
 
+  test("passes cancellation signals to active tool handlers", async () => {
+    let runId: string | undefined;
+    let toolStarted!: () => void;
+    const started = new Promise<void>((resolve) => { toolStarted = resolve; });
+    const model: ModelProvider = {
+      id: "active-tool-cancel-model",
+      capabilities: { tools: true },
+      async call({ messages }) {
+        if (messages.every((message) => message.role !== "tool")) {
+          return { text: "", toolCalls: [{ id: "cancel-call", name: "wait", input: "hello" }] };
+        }
+        return { text: "unexpected completion", toolCalls: [] };
+      },
+    };
+    const runtime = await createRuntime();
+    runtime.on("run.started", (event) => {
+      runId = (event.payload as { runId: string }).runId;
+    });
+    runtime.registerAgent(defineAgent({
+      name: "assistant",
+      model,
+      tools: [{
+        name: "wait",
+        description: "A cancellable wait",
+        schema: stringSchema,
+        execute: async (_input, { signal }) => {
+          toolStarted();
+          await new Promise<void>((resolve, reject) => {
+            if (signal?.aborted) {
+              reject(signal.reason ?? new DOMException("aborted", "AbortError"));
+              return;
+            }
+            signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+          });
+          return "unreachable";
+        },
+      }],
+    }));
+
+    const pending = runtime.run("assistant", "hello");
+    await started;
+    const cancelled = await runtime.cancel(runId!);
+
+    expect(cancelled?.status).toBe("cancelled");
+    await expect(pending).rejects.toMatchObject({ code: "CANCELLED" });
+  });
+
   test("interrupts an active run and starts a linked continuation", async () => {
     let calls = 0;
     let sessionId: string | undefined;

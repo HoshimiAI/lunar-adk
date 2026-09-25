@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createRuntime, defineAgent, definePlugin, defineTool, defineWorkflow, InMemoryWorkflowStore } from "@lunar/adk";
-import type { ModelProvider } from "@lunar/adk";
-import { createApp, createAppWithBetterAuth, createInMemoryRateLimitStore } from "./app";
+import type { MemoryProvider, ModelProvider } from "@lunar/adk";
+import { createApp, createAppWithBetterAuth, createDefaultApp, createInMemoryRateLimitStore } from "./app";
 import { calculatorTool, currentTimeTool } from "./tools";
 
 const testModel: ModelProvider = {
@@ -11,6 +11,35 @@ const testModel: ModelProvider = {
     return { text: `Test: ${messages.at(-1)?.content ?? ""}`, toolCalls: [] };
   },
 };
+
+test("default app requires an explicit authentication decision", async () => {
+  await expect(createDefaultApp()).rejects.toThrow("requires an AuthProvider or allowUnauthenticated: true");
+});
+
+test("redacts internal run failures from HTTP responses", async () => {
+  const secret = "provider-secret-value";
+  const runtime = await createRuntime();
+  runtime.registerAgent(defineAgent({
+    name: "assistant",
+    model: { id: "failing", capabilities: {}, async call() { throw new Error(secret); } },
+  }));
+  const app = await createApp(runtime);
+  const response = await app.handle(new Request("http://localhost/run", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ input: "hello" }),
+  }));
+  const failure = await response.json() as { error: string; runId: string };
+  const inspected = await app.handle(new Request(`http://localhost/runs/${failure.runId}`));
+  const publicRecord = await inspected.json();
+  const storedRecord = await runtime.getStoredRun(failure.runId);
+
+  expect(response.status).toBe(500);
+  expect(failure.error).toBe("Agent run failed");
+  expect(inspected.status).toBe(200);
+  expect(JSON.stringify(publicRecord)).not.toContain(secret);
+  expect(storedRecord?.error).toContain(secret);
+});
 
 async function createTestApp() {
   const runtime = await createRuntime();
@@ -224,6 +253,36 @@ test("exposes installed plugin bundles and runs their workflows", async () => {
     expect((await listed.json()).records).toHaveLength(1);
     const deleted = await app.handle(new Request(`http://localhost/memories/${record.id}`, { method: "DELETE" }));
     expect(deleted.status).toBe(200);
+  });
+
+  test("does not invoke the ADK embedding provider for provider-owned memory", async () => {
+    let embeddingCalls = 0;
+    let receivedEmbedding: number[] | undefined;
+    const provider: MemoryProvider = {
+      id: "planet-memory",
+      capabilities: { semanticSearch: true, embeddingOwner: "provider" },
+      async store(input) { return { ...input, id: "planet-record", createdAt: Date.now() }; },
+      async retrieve(query) { receivedEmbedding = query.embedding; return []; },
+    };
+    const runtime = await createRuntime({ memory: provider });
+    const app = await createApp(runtime, {
+      auth: { async authenticate() { return { subjectId: "user-a", tenantId: "tenant-a", permissions: ["memory:read", "memory:write"] }; } },
+      embedding: { id: "adk-embedding", async embed() { embeddingCalls += 1; return [1, 0]; } },
+    });
+    const headers = { "content-type": "application/json" };
+    const created = await app.handle(new Request("http://localhost/memories", {
+      method: "POST", headers,
+      body: JSON.stringify({ content: "raw content", expiresAt: new Date(Date.now() + 60_000).toISOString() }),
+    }));
+    const searched = await app.handle(new Request("http://localhost/memories/search", {
+      method: "POST", headers,
+      body: JSON.stringify({ text: "raw query" }),
+    }));
+
+    expect(created.status).toBe(201);
+    expect(searched.status).toBe(200);
+    expect(embeddingCalls).toBe(0);
+    expect(receivedEmbedding).toBeUndefined();
   });
 
   test("ingests a text upload as embedded, tenant-scoped memory chunks", async () => {

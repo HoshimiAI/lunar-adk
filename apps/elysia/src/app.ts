@@ -1,14 +1,14 @@
 import { Elysia, t } from "elysia";
 import { SQL } from "bun";
-import { Planet, type SqlStore } from "@unknown-planet/sdk";
+import { Planet, type PlanetScope, type SqlStore } from "@unknown-planet/sdk";
 import { AgentRunError, StorageConflictError, createRuntime, defineAgent } from "@lunar/adk";
-import type { AgentConfig, AuthPrincipal, AuthProvider, EmbeddingProvider, Run, RuntimeHandle, RuntimeStreamEvent, Session } from "@lunar/adk";
+import type { AgentConfig, AuthPrincipal, AuthProvider, EmbeddingProvider, MemoryProvider, Run, RuntimeHandle, RuntimeStreamEvent, Session, WorkflowRun } from "@lunar/adk";
 import { createOpenAIEmbeddingProvider, createOpenAIModelProvider } from "@lunar/provider-openai";
 import { createSqliteStores } from "@lunar/storage-sqlite";
 import { createHttpStores } from "@lunar/storage-http";
 import { createBunSqlStores, type BunSqlDialect } from "@lunar/storage-bun-sql";
 import { createBunSqlMemoryProvider } from "@lunar/memory-bun-sql";
-import { createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar/storage-unknown-planet";
+import { createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar/storage-unknown-planet";
 import { createBetterAuthProvider, type BetterAuthLike, type BetterAuthSession } from "@lunar/auth-better-auth";
 import { createConsoleExporter, createOTLPExporter } from "@lunar/observability-otel";
 import { elysiaTools } from "./tools";
@@ -37,6 +37,27 @@ function runMetrics(run: Run) {
   };
 }
 
+const PUBLIC_FAILURE = "Execution failed";
+
+function publicEvent(event: Run["events"][number]): Run["events"][number] {
+  return event.name.endsWith(".failed")
+    ? { ...event, payload: { error: PUBLIC_FAILURE } }
+    : event;
+}
+
+function publicRun(run: Run): Run {
+  return {
+    ...run,
+    ...(run.error === undefined ? {} : { error: PUBLIC_FAILURE }),
+    trace: run.trace.map((span) => span.error === undefined ? span : { ...span, error: PUBLIC_FAILURE }),
+    events: run.events.map(publicEvent),
+  };
+}
+
+function publicWorkflowRun(run: WorkflowRun): WorkflowRun {
+  return run.error === undefined ? run : { ...run, error: PUBLIC_FAILURE };
+}
+
 async function sessionUsage(session: Session, runtime: RuntimeHandle) {
   const runIds = [...new Set(session.runIds ?? session.runs?.map((run) => run.id) ?? [])];
   const runs = (await Promise.all(runIds.map((id) => runtime.getStoredRun(id))))
@@ -59,7 +80,10 @@ async function sessionUsage(session: Session, runtime: RuntimeHandle) {
 }
 
 function toSse(event: RuntimeStreamEvent): { name: string; data: unknown } {
-  if (event.type === "event") return { name: event.event.name, data: event.event };
+  if (event.type === "event") return {
+    name: event.event.name,
+    data: publicEvent(event.event),
+  };
   if (event.type === "text.delta") return { name: event.type, data: { runId: event.runId, text: event.text } };
   if (event.type === "stream.interrupted") return { name: event.type, data: event };
   if (event.type === "stream.completed") {
@@ -77,7 +101,11 @@ function toSse(event: RuntimeStreamEvent): { name: string; data: unknown } {
   }
   return {
     name: event.type,
-    data: { error: event.error, runId: event.runId, code: event.code },
+    data: {
+      error: event.code === "POLICY_DENIED" || event.code === "CANCELLED" ? event.error : "Stream failed",
+      runId: event.runId,
+      code: event.code,
+    },
   };
 }
 
@@ -86,7 +114,7 @@ export interface AppOptions {
   ready?: () => Promise<void>;
   authHandler?: (request: Request) => Response | Promise<Response>;
   authRoutePrefix?: string;
-  /** Used to create vectors for uploaded file chunks. */
+  /** ADK-owned embeddings for Lunar-native memory. This does not configure Unknown Planet. */
   embedding?: EmbeddingProvider;
   /** Resume persisted running workflows before accepting requests. */
   recoverWorkflowsOnStartup?: boolean;
@@ -104,11 +132,20 @@ export interface AppOptions {
   configureRuntime?: (runtime: RuntimeHandle) => void | Promise<void>;
   /** Add tools to the default assistant. */
   agentTools?: NonNullable<AgentConfig["tools"]>;
+  /** Provide a Planet client configured with the capabilities used by the app. */
+  unknownPlanet?: { planet: Planet; scope: PlanetScope };
+}
+
+export interface DefaultAppOptions extends AppOptions {
+  /** Explicitly permit the default server to serve agent routes without authentication. */
+  allowUnauthenticated?: boolean;
 }
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const CHUNK_SIZE = 2_000;
 const CHUNK_OVERLAP = 200;
+const EMBEDDING_BATCH_SIZE = 32;
+const MEMORY_WRITE_BATCH_SIZE = 8;
 
 function splitText(content: string): string[] {
   const chunks: string[] = [];
@@ -260,13 +297,21 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
       }
     })
     .onError(({ code, error, set }) => {
+      if (code === "NOT_FOUND") {
+        set.status = 404;
+        return { error: "Not found" };
+      }
+      if (code === "PARSE") {
+        set.status = 400;
+        return { error: "Invalid request body" };
+      }
       if (code === "VALIDATION") {
         set.status = 422;
         return { error: "Invalid request", details: error.message };
       }
       if (error instanceof AgentRunError) {
         set.status = error.code === "CANCELLED" ? 409 : error.code === "POLICY_DENIED" ? 403 : 500;
-        return { error: error.message, runId: error.run.id };
+        return { error: set.status === 500 ? "Agent run failed" : error.message, runId: error.run.id };
       }
       if (error instanceof StorageConflictError) {
         set.status = 409;
@@ -288,6 +333,8 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 409;
         return { error: error.message };
       }
+      set.status = 500;
+      return { error: "Internal server error" };
     })
     .get("/health", () => ({ name: "lunar-elysia", status: "ok" }))
     .get("/plugins", () => ({ plugins: runtime.listPlugins() }))
@@ -322,9 +369,9 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
                 const encoded = toSse(event);
                 controller.enqueue(encodeSse(encoded.name, encoded.data));
               }
-            } catch (error) {
+            } catch {
               controller.enqueue(encodeSse("stream.error", {
-                error: error instanceof Error ? error.message : String(error),
+                error: "Stream failed",
               }));
             } finally {
               controller.close();
@@ -352,7 +399,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 404;
         return { error: "Run not found" };
       }
-      return { ...run, ...runMetrics(run) };
+      return { ...publicRun(run), ...runMetrics(run) };
     })
     .get("/sessions/:id", async ({ params, set, principal }) => {
       const session = await runtime.getSession(params.id);
@@ -376,7 +423,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 404;
         return { error: "Workflow run not found" };
       }
-      return run;
+      return publicWorkflowRun(run);
     })
     .post("/workflow-runs/:id/cancel", async ({ params, set, principal }) => {
       if (!(await workflowAllowed(params.id, principal))) { set.status = 404; return { error: "Workflow run not found" }; }
@@ -385,7 +432,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 404;
         return { error: "Workflow run not found" };
       }
-      return run;
+      return publicWorkflowRun(run);
     })
     .post(
       "/workflow-runs/:id/resume",
@@ -403,7 +450,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 404;
         return { error: "Run not found" };
       }
-      return run;
+      return publicRun(run);
     })
     .post(
       "/runs/:id/approve",
@@ -424,7 +471,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
       async ({ params, body, set, principal }) => {
         if (!(await runAllowed(params.id, principal))) { set.status = 404; return { error: "Run not found" }; }
         const run = await runtime.reject(params.id, body.approvalId);
-        return run;
+        return publicRun(run);
       },
       { body: t.Object({ approvalId: t.String({ minLength: 1 }) }) },
     )
@@ -452,7 +499,8 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         if (!provider) { set.status = 404; return { error: "Memory is not configured" }; }
         const expiresAt = new Date(body.expiresAt).getTime();
         if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) { set.status = 422; return { error: "expiresAt must be in the future" }; }
-        const record = await provider.store({ content: body.content, namespace: body.namespace, metadata: body.metadata, tenantId: principal!.tenantId, ownerId: principal!.subjectId, expiresAt });
+        const embedding = provider.capabilities?.embeddingOwner === "provider" ? undefined : options.embedding ? await options.embedding.embed(body.content) : undefined;
+        const record = await provider.store({ content: body.content, namespace: body.namespace, metadata: body.metadata, tenantId: principal!.tenantId, ownerId: principal!.subjectId, expiresAt, ...(embedding ? { embedding } : {}) });
         set.status = 201;
         return record;
       },
@@ -472,24 +520,43 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         const chunks = splitText(content);
         if (chunks.length === 0) { set.status = 422; return { error: "File does not contain text" }; }
         const sourceId = crypto.randomUUID();
-        const records = await Promise.all(chunks.map(async (chunk, index) => provider.store({
-          content: chunk,
-          namespace: body.namespace,
-          tenantId: principal!.tenantId,
-          ownerId: principal!.subjectId,
-          expiresAt,
-          ...(options.embedding ? { embedding: await options.embedding.embed(chunk) } : {}),
-          metadata: {
-            sourceId,
-            filename: body.file.name,
-            mimeType: body.file.type || "text/plain",
-            chunkIndex: index,
-            chunkCount: chunks.length,
-            ...(options.embedding ? { embeddingModel: options.embedding.id } : {}),
-          },
-        })));
+        let embeddings: number[][] | undefined;
+        if (provider.capabilities?.embeddingOwner !== "provider" && options.embedding) {
+          embeddings = [];
+          for (let offset = 0; offset < chunks.length; offset += EMBEDDING_BATCH_SIZE) {
+            const batch = chunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+            const vectors = options.embedding.embedMany
+              ? await options.embedding.embedMany(batch)
+              : await Promise.all(batch.map((chunk) => options.embedding!.embed(chunk)));
+            if (vectors.length !== batch.length) throw new Error(`Embedding provider returned ${vectors.length} vectors for ${batch.length} chunks.`);
+            embeddings.push(...vectors);
+          }
+        }
+        const records: Awaited<ReturnType<typeof provider.store>>[] = [];
+        for (let offset = 0; offset < chunks.length; offset += MEMORY_WRITE_BATCH_SIZE) {
+          const batch = await Promise.all(chunks.slice(offset, offset + MEMORY_WRITE_BATCH_SIZE).map((chunk, batchIndex) => {
+            const index = offset + batchIndex;
+            return provider.store({
+              content: chunk,
+              namespace: body.namespace,
+              tenantId: principal!.tenantId,
+              ownerId: principal!.subjectId,
+              expiresAt,
+              ...(embeddings ? { embedding: embeddings[index]! } : {}),
+              metadata: {
+                sourceId,
+                filename: body.file.name,
+                mimeType: body.file.type || "text/plain",
+                chunkIndex: index,
+                chunkCount: chunks.length,
+                ...(embeddings && options.embedding ? { embeddingModel: options.embedding.model ?? options.embedding.id } : {}),
+              },
+            });
+          }));
+          records.push(...batch);
+        }
         set.status = 201;
-        return { sourceId, filename: body.file.name, chunks: records.length, embedded: Boolean(options.embedding), records };
+        return { sourceId, filename: body.file.name, chunks: records.length, embedded: provider.capabilities?.embeddingOwner === "provider" || Boolean(embeddings), records };
       },
       { body: t.Object({ file: t.File(), expiresAt: t.String(), namespace: t.Optional(t.String()) }) },
     )
@@ -497,13 +564,18 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
       if (!can(principal, "memory:read")) { set.status = 403; return { error: "Forbidden" }; }
       const provider = runtime.getMemoryProvider();
       if (!provider?.list) { set.status = 404; return { error: "Memory listing is not configured" }; }
-      return provider.list({ tenantId: principal!.tenantId, ownerId: principal!.subjectId, namespace: query.namespace, cursor: query.cursor, limit: query.limit ? Number(query.limit) : undefined });
+      const limit = query.limit === undefined ? undefined : Number(query.limit);
+      if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1 || limit > 100)) {
+        set.status = 422;
+        return { error: "limit must be an integer from 1 to 100" };
+      }
+      return provider.list({ tenantId: principal!.tenantId, ownerId: principal!.subjectId, namespace: query.namespace, cursor: query.cursor, limit });
     }, { query: t.Object({ namespace: t.Optional(t.String()), cursor: t.Optional(t.String()), limit: t.Optional(t.String()) }) })
     .post("/memories/search", async ({ body, principal, set }) => {
       if (!can(principal, "memory:read")) { set.status = 403; return { error: "Forbidden" }; }
       const provider = runtime.getMemoryProvider();
       if (!provider) { set.status = 404; return { error: "Memory is not configured" }; }
-      const embedding = options.embedding ? await options.embedding.embed(body.text) : undefined;
+      const embedding = provider.capabilities?.embeddingOwner === "provider" ? undefined : options.embedding ? await options.embedding.embed(body.text) : undefined;
       const records = await provider.retrieve({
         text: body.text,
         tenantId: principal!.tenantId,
@@ -595,7 +667,10 @@ function rateLimitFromEnvironment(): AppOptions["rateLimit"] {
   };
 }
 
-export async function createDefaultApp(options: AppOptions = {}) {
+export async function createDefaultApp(options: DefaultAppOptions = {}) {
+  if (!options.auth && !options.allowUnauthenticated) {
+    throw new Error("The default app requires an AuthProvider or allowUnauthenticated: true");
+  }
   const rateLimit = options.rateLimit ?? rateLimitFromEnvironment();
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -607,25 +682,29 @@ export async function createDefaultApp(options: AppOptions = {}) {
     throw new Error(`Unsupported STORAGE_PROVIDER: ${storageProvider}`);
   }
   let planetClient: SQL | undefined;
+  let planet = options.unknownPlanet?.planet;
   const storage = storageProvider === "unknown-planet"
     ? await (async () => {
-        const databaseUrl = process.env.DATABASE_URL ?? (() => { throw new Error("DATABASE_URL is required when STORAGE_PROVIDER=unknown-planet"); })();
-        planetClient = new SQL(databaseUrl);
-        const sqlStore: SqlStore = {
-          async query<T extends Record<string, unknown> = Record<string, unknown>>(input: Parameters<SqlStore["query"]>[0]) {
-            const rows = await planetClient!.unsafe(input.text, [...(input.values ?? [])]);
-            return { rows: rows as T[], rowCount: rows.length };
-          },
-          transaction: (work) => planetClient!.begin((transaction) => work({
+        if (!planet) {
+          const databaseUrl = process.env.DATABASE_URL ?? (() => { throw new Error("DATABASE_URL is required when STORAGE_PROVIDER=unknown-planet"); })();
+          planetClient = new SQL(databaseUrl);
+          const sqlStore: SqlStore = {
             async query<T extends Record<string, unknown> = Record<string, unknown>>(input: Parameters<SqlStore["query"]>[0]) {
-              const rows = await transaction.unsafe(input.text, [...(input.values ?? [])]);
+              const rows = await planetClient!.unsafe(input.text, [...(input.values ?? [])]);
               return { rows: rows as T[], rowCount: rows.length };
             },
-          })),
-        };
-        const planet = new Planet({ sql: sqlStore });
+            transaction: (work) => planetClient!.begin((transaction) => work({
+              async query<T extends Record<string, unknown> = Record<string, unknown>>(input: Parameters<SqlStore["query"]>[0]) {
+                const rows = await transaction.unsafe(input.text, [...(input.values ?? [])]);
+                return { rows: rows as T[], rowCount: rows.length };
+              },
+            })),
+          };
+          planet = new Planet({ sql: sqlStore });
+        }
+        const scope = options.unknownPlanet?.scope ?? { tenantId: process.env.PLANET_TENANT_ID ?? "lunar-local" };
         await migrateUnknownPlanetStorage({ planet });
-        return createUnknownPlanetStorage({ planet, scope: { tenantId: process.env.PLANET_TENANT_ID ?? "lunar-local" } });
+        return createUnknownPlanetStorage({ planet, scope });
       })()
     : storageProvider === "http"
     ? createHttpStores({
@@ -639,15 +718,21 @@ export async function createDefaultApp(options: AppOptions = {}) {
           dialect: storageProvider as BunSqlDialect,
         });
   const memoryProviderName = process.env.MEMORY_PROVIDER;
-  if (memoryProviderName !== undefined && memoryProviderName !== "postgres") {
+  if (memoryProviderName !== undefined && memoryProviderName !== "postgres" && memoryProviderName !== "unknown-planet") {
     throw new Error(`Unsupported MEMORY_PROVIDER: ${memoryProviderName}`);
   }
-  const memoryProvider = memoryProviderName === "postgres"
-    ? await createBunSqlMemoryProvider({ connection: process.env.MEMORY_DATABASE_URL ?? process.env.DATABASE_URL ?? (() => { throw new Error("MEMORY_DATABASE_URL or DATABASE_URL is required when MEMORY_PROVIDER=postgres"); })() })
-    : undefined;
+  if (memoryProviderName === "unknown-planet" && !options.unknownPlanet) {
+    throw new Error("Pass a configured unknownPlanet Planet client and scope when MEMORY_PROVIDER=unknown-planet");
+  }
+  const memoryProvider: MemoryProvider | undefined = memoryProviderName === "unknown-planet"
+    ? createUnknownPlanetMemoryProvider(options.unknownPlanet!)
+    : memoryProviderName === "postgres"
+      ? await createBunSqlMemoryProvider({ connection: process.env.MEMORY_DATABASE_URL ?? process.env.DATABASE_URL ?? (() => { throw new Error("MEMORY_DATABASE_URL or DATABASE_URL is required when MEMORY_PROVIDER=postgres"); })() })
+      : undefined;
   const embedding = createOpenAIEmbeddingProvider({
     apiKey,
     model: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
+    ...(process.env.OPENAI_EMBEDDING_DIMENSIONS ? { dimensions: Number(process.env.OPENAI_EMBEDDING_DIMENSIONS) } : {}),
   });
   const exporters = [];
   if (process.env.LUNAR_TELEMETRY === "console") exporters.push(createConsoleExporter());
@@ -686,7 +771,9 @@ export async function createDefaultApp(options: AppOptions = {}) {
     embedding: options.embedding ?? embedding,
     ready: async () => {
       await storage.health?.();
-      await memoryProvider?.health();
+      if (memoryProvider && "health" in memoryProvider && typeof memoryProvider.health === "function") {
+        await memoryProvider.health();
+      }
     },
   });
   return app.onStop(async () => {

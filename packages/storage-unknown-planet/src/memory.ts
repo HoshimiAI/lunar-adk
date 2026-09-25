@@ -2,7 +2,6 @@ import type { MemoryListQuery, MemoryPage, MemoryProvider, MemoryQuery, MemoryRe
 import type { JsonObject, MemoryRecord as PlanetMemoryRecord, Planet, PlanetScope } from "@unknown-planet/sdk";
 
 const DEFAULT_PROVIDER_ID = "unknown-planet";
-const PROVIDER_NAMESPACE = "lunar-adk-memory";
 // Planet's cursor-based memory search clamps page sizes to 500.
 const PAGE_LIMIT = 500;
 
@@ -57,7 +56,6 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
   const scopedTenantId = options.scope.tenantId;
   const providerId = options.id ?? DEFAULT_PROVIDER_ID;
   const agentId = `lunar-adk:${providerId}`;
-  const vectorNamespace = `${PROVIDER_NAMESPACE}:${providerId}`;
 
   async function textPage(input: { text?: string; ownerId?: string; limit: number; cursor?: string; namespace?: string; filter?: Record<string, unknown> }): Promise<{ records: MemoryRecord[]; nextCursor?: string }> {
     const records: MemoryRecord[] = [];
@@ -84,12 +82,12 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
 
   return {
     id: providerId,
-    capabilities: { semanticSearch: true, metadataFiltering: true, namespaces: true, deletion: true },
+    capabilities: { semanticSearch: true, embeddingOwner: "provider", metadataFiltering: true, namespaces: true, deletion: true },
     async store(input) {
       if (input.tenantId !== undefined && input.tenantId !== scopedTenantId) throw new Error("Memory tenantId does not match the configured Unknown Planet scope.");
       if (input.expiresAt !== undefined && (!Number.isFinite(input.expiresAt) || input.expiresAt <= Date.now())) throw new Error("Memory expiresAt must be in the future.");
       const id = crypto.randomUUID();
-      const stored = await planet.memory.persist({
+      const stored = await planet.memory.add({
         id,
         agentId,
         content: input.content,
@@ -97,32 +95,32 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
         ...(input.ownerId === undefined ? {} : { userId: input.ownerId }),
         metadata: { lunarAdk: { namespace: input.namespace, expiresAt: input.expiresAt, metadata: input.metadata } } as JsonObject,
       });
-      try {
-        if (input.embedding) await planet.vector.upsert({ id, namespace: vectorNamespace, embedding: input.embedding, metadata: { ownerId: input.ownerId ?? "", namespace: input.namespace ?? "" } });
-      } catch (error) {
-        await planet.memory.delete(id);
-        throw error;
-      }
-      return { ...input, id: stored.id, tenantId: scopedTenantId, createdAt: stored.createdAt.getTime() };
+      // Planet owns embedding and graph ingestion for content sent to its memory API.
+      // ADK's optional precomputed embedding is intentionally not forwarded.
+      return {
+        id: stored.id,
+        content: stored.content,
+        ...(input.metadata ? { metadata: input.metadata } : {}),
+        ...(input.namespace === undefined ? {} : { namespace: input.namespace }),
+        tenantId: scopedTenantId,
+        ...(input.ownerId === undefined ? {} : { ownerId: input.ownerId }),
+        ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
+        createdAt: stored.createdAt.getTime(),
+      };
     },
     async retrieve(query: MemoryQuery) {
       const limit = Math.max(0, Math.min(100, Math.floor(query.limit ?? 10)));
       if (limit === 0) return [];
-      if (query.embedding !== undefined) {
-        const matches = await planet.vector.search({ embedding: query.embedding, namespace: vectorNamespace, limit: PAGE_LIMIT });
-        const results: MemoryRecord[] = [];
-        for (const match of matches) {
-          const item = await planet.memory.get(match.id);
-          if (!item) continue;
-          const mapped = record(item, scopedTenantId, match.score);
-          if (match.score < (query.minScore ?? -1) || !matchesMemory(mapped, query)) continue;
-          results.push(mapped);
-          if (results.length >= limit) break;
-        }
-        return results;
-      }
-      const result = await textPage({ text: query.text, ownerId: query.ownerId, limit: PAGE_LIMIT, namespace: query.namespace, filter: query.filter });
-      return result.records.filter((item) => query.minScore === undefined || query.minScore <= 1).slice(0, limit);
+      if (query.minScore !== undefined && query.minScore > 1) return [];
+      const found = await planet.memory.search({
+        agentId,
+        ...(query.ownerId === undefined ? {} : { userId: query.ownerId }),
+        ...(query.text.trim() ? { query: query.text } : {}),
+        limit: PAGE_LIMIT,
+      });
+      const result = found.map((item) => record(item, scopedTenantId));
+      const filtered = result.filter((item) => matchesMemory(item, query));
+      return filtered.slice(0, limit);
     },
     async list(query: MemoryListQuery): Promise<MemoryPage> {
       const limit = Math.max(1, Math.min(100, Math.floor(query.limit ?? 50)));
@@ -133,7 +131,6 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
       if (tenantId !== undefined && tenantId !== scopedTenantId) return false;
       const current = await planet.memory.get(id);
       if (!current || (ownerId !== undefined && current.userId !== ownerId)) return false;
-      await planet.vector.delete({ id, namespace: vectorNamespace });
       return planet.memory.delete(id);
     },
   };

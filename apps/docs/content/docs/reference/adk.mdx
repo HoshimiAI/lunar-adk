@@ -70,9 +70,24 @@ The handle exposes `run`, `stream`, `supportsStreaming`, `steer`, `approve`,
 
 Accepts `name`, `model`, optional `systemPrompt`, `tools`,
 `maxToolRoundtrips`, `retryPolicy`, `maxContextTokens`, and opt-in `memory`.
+Optional `hooks` provides async `beforeModel`, `afterModel`, `beforeTool`, and
+`afterTool` callbacks. Hooks receive read-only execution context and run in
+sequence at their lifecycle point; a thrown error fails the agent run. Hooks
+observe inputs and results and do not replace them.
 Memory options select a provider, namespace, metadata filter, retrieval limit,
 and whether completed conversations are stored. Returns an `Agent`
 with `run(input, options?)`.
+
+```ts
+defineAgent({
+  name: "assistant",
+  model,
+  hooks: {
+    beforeModel: ({ runId, round }) => logger.info({ runId, round }, "model call"),
+    afterTool: ({ toolCall, result }) => audit({ tool: toolCall.name, result }),
+  },
+});
+```
 
 ## `defineTool<Input, Output>(tool)`
 
@@ -97,7 +112,7 @@ schemas, and policy rules through `PluginContext`; optional `start()` and
 
 ## Common types
 
-The facade exports `Agent`, `AgentConfig`, `AgentRunOptions`, `AgentRunResult`,
+The facade exports `Agent`, `AgentConfig`, `AgentHooks`, `AgentRunOptions`, `AgentRunResult`,
 `Tool`, `ToolResult`, `Plugin`, `PluginContext`, `PluginManifest`,
 `PluginPermissions`, `ModelProvider`, `ModelResponse`, `ModelStreamPart`,
 `Run`, `Session`, `Workflow`, `WorkflowRun`, and their related status and store

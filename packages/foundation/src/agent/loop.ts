@@ -106,6 +106,7 @@ export async function runAgentLoop(
         let response: ModelResponse;
         const modelSpan = startSpan(`model.${config.model.id}`, "model", run.id, agentSpan.id, { "lunar.model": config.model.id });
         try {
+        await config.hooks?.beforeModel?.({ agent: config.name, runId: run.id, round, options: modelOptions });
         if (options.streaming) {
           if (config.model.capabilities.streaming !== true || !config.model.stream) {
             throw new Error(`Model "${config.model.id}" does not support streaming`);
@@ -127,6 +128,7 @@ export async function runAgentLoop(
             options.signal,
           );
         }
+        await config.hooks?.afterModel?.({ agent: config.name, runId: run.id, round, response });
         run = { ...run, trace: [...run.trace, endSpan(modelSpan, "ok")] };
         } catch (error) {
           run = { ...run, trace: [...run.trace, endSpan(modelSpan, "error", error instanceof Error ? error.message : String(error))] };
@@ -185,9 +187,20 @@ export async function runAgentLoop(
         );
       }
 
-      const result = !tool
-        ? { toolName: toolCall.name, error: `Unknown tool: ${toolCall.name}` }
-        : await executeTool(tool, toolCall.input, { approved: approvedToolCallId === toolCall.id });
+      let result: { toolName: string; output?: unknown; error?: string };
+      try {
+        await config.hooks?.beforeTool?.({ agent: config.name, runId: run.id, toolCall });
+        result = !tool
+          ? { toolName: toolCall.name, error: `Unknown tool: ${toolCall.name}` }
+          : await executeTool(tool, toolCall.input, {
+              approved: approvedToolCallId === toolCall.id,
+              signal: options.signal,
+            });
+        await config.hooks?.afterTool?.({ agent: config.name, runId: run.id, toolCall, result });
+      } catch (error) {
+        run = { ...run, trace: run.trace.map((span) => span.id === toolSpan.id ? endSpan(span, "error", error instanceof Error ? error.message : String(error)) : span) };
+        throw error;
+      }
       record(result.error ? "tool.failed" : "tool.completed", {
         tool: toolCall.name,
         runId: run.id,

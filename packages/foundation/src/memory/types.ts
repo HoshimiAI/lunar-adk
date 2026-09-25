@@ -25,7 +25,10 @@ export interface MemoryQuery {
 
 export interface EmbeddingProvider {
   readonly id: string;
+  readonly model?: string;
+  readonly dimensions?: number;
   embed(input: string): Promise<number[]>;
+  embedMany?(inputs: string[]): Promise<number[][]>;
 }
 
 export interface MemoryListQuery {
@@ -44,6 +47,8 @@ export interface MemoryPage {
 
 export interface MemoryCapabilities {
   semanticSearch?: boolean;
+  /** The provider owns embedding for stored content and semantic queries. */
+  embeddingOwner?: "provider";
   metadataFiltering?: boolean;
   namespaces?: boolean;
   deletion?: boolean;

@@ -25,9 +25,23 @@ export class HttpStorageError extends Error {
 type StoredRecord = { id: string; revision?: number };
 
 function normalizeBaseUrl(baseUrl: string): string {
-  const normalized = baseUrl.trim().replace(/\/+$/, "");
-  if (!normalized) throw new Error("HTTP storage baseUrl is required");
-  return normalized;
+  let url: URL;
+  try {
+    url = new URL(baseUrl.trim());
+  } catch {
+    throw new Error("HTTP storage baseUrl must be an absolute HTTP URL");
+  }
+  if (!["http:", "https:"].includes(url.protocol) || url.search || url.hash || url.username || url.password) {
+    throw new Error("HTTP storage baseUrl must be an HTTP URL without credentials, query, or fragment");
+  }
+  return url.href.replace(/\/+$/, "");
+}
+
+function validateIdentifier(id: string): string {
+  if (!id || id === "." || id === "..") {
+    throw new Error("HTTP storage identifier must be a nonempty path segment");
+  }
+  return encodeURIComponent(id);
 }
 
 function isRetryable(status?: number): boolean {
@@ -49,6 +63,15 @@ class HttpStore<T extends StoredRecord> {
 
   constructor(private readonly resource: string, options: HttpStorageOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
+    if (!Number.isSafeInteger(options.timeoutMs ?? 10_000) || (options.timeoutMs ?? 10_000) < 1) {
+      throw new Error("HTTP storage timeoutMs must be a positive safe integer");
+    }
+    if (!Number.isSafeInteger(options.maxAttempts ?? 3) || (options.maxAttempts ?? 3) < 1) {
+      throw new Error("HTTP storage maxAttempts must be a positive safe integer");
+    }
+    if (!Number.isSafeInteger(options.retryDelayMs ?? 100) || (options.retryDelayMs ?? 100) < 0) {
+      throw new Error("HTTP storage retryDelayMs must be a nonnegative safe integer");
+    }
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.headers = {
       accept: "application/json",
@@ -56,8 +79,8 @@ class HttpStore<T extends StoredRecord> {
       ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
     };
     this.timeoutMs = options.timeoutMs ?? 10_000;
-    this.maxAttempts = Math.max(1, options.maxAttempts ?? 3);
-    this.retryDelayMs = Math.max(0, options.retryDelayMs ?? 100);
+    this.maxAttempts = options.maxAttempts ?? 3;
+    this.retryDelayMs = options.retryDelayMs ?? 100;
   }
 
   async save(value: T, options: SaveOptions = {}): Promise<T> {
@@ -97,6 +120,7 @@ class HttpStore<T extends StoredRecord> {
   }
 
   private async requestWithRetry(id: string, method: "GET" | "PUT", value?: T, expectedRevision?: number, createOnly = false): Promise<unknown> {
+    const encodedId = validateIdentifier(id);
     let lastError: unknown;
     for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
       try {
@@ -104,7 +128,7 @@ class HttpStore<T extends StoredRecord> {
         const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
         let response: Response;
         try {
-          response = await this.fetcher(`${this.baseUrl}/v1/${this.resource}/${encodeURIComponent(id)}`, {
+          response = await this.fetcher(`${this.baseUrl}/v1/${this.resource}/${encodedId}`, {
             method,
             headers: {
               ...this.headers,

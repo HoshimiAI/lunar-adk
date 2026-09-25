@@ -7,6 +7,16 @@ import type { Run, RunContinuation } from "../run";
 import type { LunarEvent } from "../event";
 import type { MemoryProvider } from "../memory";
 import type { PolicyEnforcer } from "../policy";
+import type { ModelCallOptions, ModelResponse, ModelToolCall } from "../model";
+import type { ToolResult } from "../tool";
+
+/** Read-only lifecycle callbacks for observing agent execution. Throwing from a hook fails the run. */
+export interface AgentHooks {
+  beforeModel?(context: { agent: string; runId: string; round: number; options: Readonly<ModelCallOptions> }): void | Promise<void>;
+  afterModel?(context: { agent: string; runId: string; round: number; response: Readonly<ModelResponse> }): void | Promise<void>;
+  beforeTool?(context: { agent: string; runId: string; toolCall: Readonly<ModelToolCall> }): void | Promise<void>;
+  afterTool?(context: { agent: string; runId: string; toolCall: Readonly<ModelToolCall>; result: Readonly<ToolResult> }): void | Promise<void>;
+}
 
 export type AgentState = "idle" | "running" | "waiting" | "done" | "error";
 
@@ -27,6 +37,7 @@ export interface AgentConfig {
   retryPolicy?: RetryPolicy;
   maxContextTokens?: number;
   memory?: boolean | AgentMemoryConfig;
+  hooks?: AgentHooks;
 }
 
 export interface AgentRunOptions {

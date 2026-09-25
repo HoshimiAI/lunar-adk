@@ -15,7 +15,7 @@ liveTest(
     let app: Awaited<ReturnType<typeof createDefaultApp>> | undefined;
 
     try {
-      app = await createDefaultApp();
+      app = await createDefaultApp({ allowUnauthenticated: true });
       const firstResponse = await app.handle(
         new Request("http://localhost/run", {
           method: "POST",
@@ -69,7 +69,7 @@ liveTest(
     let app: Awaited<ReturnType<typeof createDefaultApp>> | undefined;
 
     try {
-      app = await createDefaultApp();
+      app = await createDefaultApp({ allowUnauthenticated: true });
       const response = await app.handle(
         new Request("http://localhost/run/stream", {
           method: "POST",

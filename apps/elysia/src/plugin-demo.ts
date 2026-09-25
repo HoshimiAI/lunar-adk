@@ -3,6 +3,9 @@ import { createApp } from "./app";
 import { greetingPlugin } from "./plugins/greeting-plugin";
 
 const runtime = await createRuntime({ plugins: [greetingPlugin] });
-const app = (await createApp(runtime)).listen(process.env.PORT ? Number(process.env.PORT) : 3001);
+const app = (await createApp(runtime)).listen({
+  hostname: "127.0.0.1",
+  port: process.env.PORT ? Number(process.env.PORT) : 3001,
+});
 
 console.log(`Plugin demo server running at ${app.server?.hostname}:${app.server?.port}`);
