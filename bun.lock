@@ -144,7 +144,7 @@
     },
     "packages/storage-unknown-planet": {
       "name": "@lunar/storage-unknown-planet",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "peerDependencies": {
         "@lunar/foundation": "^1.0.0",
         "@unknown-planet/sdk": "^1.0.0",
