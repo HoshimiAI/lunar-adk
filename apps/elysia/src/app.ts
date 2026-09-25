@@ -260,7 +260,12 @@ function createRateLimiter(config: AppOptions["rateLimit"], store?: RateLimitSto
 }
 
 export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}) {
-  const sessionAllowed = async (sessionId: string | undefined, principal: AuthPrincipal | undefined) => !sessionId || belongsToPrincipal(await runtime.getSession(sessionId), principal);
+  const sessionAllowed = async (sessionId: string | undefined, principal: AuthPrincipal | undefined) => {
+    if (!sessionId) return true;
+    const session = await runtime.getSession(sessionId);
+    if (session) return belongsToPrincipal(session, principal);
+    return belongsToPrincipal(runtime.getActiveRunForSession(sessionId), principal);
+  };
   const runAllowed = async (runId: string, principal: AuthPrincipal | undefined) => {
     const run = runtime.getRun(runId) ?? await runtime.getStoredRun(runId);
     return belongsToPrincipal(run, principal);
@@ -490,6 +495,26 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
       {
         body: t.Object({ instruction: t.String({ minLength: 1, maxLength: 4_000 }) }),
       },
+    )
+    .post(
+      "/sessions/:id/queue",
+      async ({ params, body, set, principal }) => {
+        if (!(await sessionAllowed(params.id, principal))) { set.status = 404; return { error: "Session not found" }; }
+        const result = await runtime.run("assistant", body.message, {
+          sessionId: params.id,
+          tenantId: principal?.tenantId,
+          ownerId: principal?.subjectId,
+        });
+        return {
+          output: result.output,
+          runId: result.run.id,
+          sessionId: result.run.sessionId,
+          status: result.run.status,
+          pendingApproval: result.run.pendingApproval,
+          ...runMetrics(result.run),
+        };
+      },
+      { body: t.Object({ message: t.String({ minLength: 1, maxLength: 32_000 }) }) },
     )
     .post(
       "/memories",

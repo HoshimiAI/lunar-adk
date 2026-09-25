@@ -1,4 +1,4 @@
 {
   "title": "Reference",
-  "pages": ["adk", "foundation", "adapters", "http-api"]
+  "pages": ["adk", "foundation", "adapters", "http-api", "mcp"]
 }

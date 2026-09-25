@@ -86,6 +86,12 @@ and model durations of completed runs rather than idle time between turns.
 `{ status: "accepted", interruptedRunId, continuationRunId, sessionId }` when
 an active run is interrupted.
 
+`POST /sessions/:id/queue` accepts `{ "message": "..." }` and runs that text
+as the next user turn in the session. Runs for one session execute in arrival
+order; the HTTP request stays open until its turn completes and returns the
+standard run response. This lets a client queue a message without interrupting
+the active run. Queue ordering is local to one runtime instance.
+
 ## Curated memory
 
 Memory endpoints are available only when the application configures both an

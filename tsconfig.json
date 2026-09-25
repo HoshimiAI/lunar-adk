@@ -14,6 +14,7 @@
     { "path": "packages/storage-bun-sql" },
     { "path": "packages/storage-mongo" },
     { "path": "packages/storage-unknown-planet" },
+    { "path": "packages/mcp" },
     { "path": "apps/elysia" }
   ]
 }

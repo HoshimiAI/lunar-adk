@@ -570,6 +570,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     },
 
     getRun: (runId) => activeRuns.get(runId)?.run ?? runs.get(runId),
+    getActiveRunForSession: (sessionId) => [...activeRuns.values()].find((active) => active.sessionId === sessionId)?.run,
     getStoredRun: (runId) => runStore.get(runId),
     getSession: async (sessionId) => {
       const session = await sessionStore.get(sessionId);

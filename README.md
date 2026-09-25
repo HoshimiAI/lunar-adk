@@ -15,6 +15,7 @@ Release status: v1.2 code-first workflows and managed subagents.
 - [`packages/storage-bun-sql`](packages/storage-bun-sql) — `@lunar/storage-bun-sql`, Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
 - [`packages/storage-mongo`](packages/storage-mongo) — `@lunar/storage-mongo`, MongoDB collection adapter using an application-provided Mongo SDK client.
 - [`packages/storage-unknown-planet`](packages/storage-unknown-planet) — `@lunar/storage-unknown-planet`, run/session/workflow storage and scoped memory for Unknown Planet.
+- [`packages/mcp`](packages/mcp) — `@lunar/mcp`, MCP tools for queueing and steering session messages.
 - [`packages/memory-sqlite`](packages/memory-sqlite) — `@lunar/memory-sqlite`, durable SQLite memory records.
 - [`packages/observability-otel`](packages/observability-otel) — `@lunar/observability-otel`, console and OTLP telemetry exporters.
 - [`apps/elysia`](apps/elysia) — API-only Elysia HTTP adapter and runnable application.
@@ -63,7 +64,7 @@ structured logs or `OTEL_EXPORTER_OTLP_ENDPOINT` for OTLP traces. Content is
 redacted by default; set `LUNAR_TELEMETRY_CAPTURE_CONTENT=true` only when
 prompt, output, and tool-input capture is appropriate for the environment.
 
-The Bruno collection in [`bruno/elysia`](bruno/elysia) covers the full API: health, runs, sessions, steering, workflow runs, cancellation, and approval decisions. Set its `baseUrl` environment variable to the running Elysia server; set `runId`, `sessionId`, `approvalId`, `workflowName`, `workflowRunId`, and `workflowApprovalId` as you exercise the dependent requests.
+The Bruno collection in [`bruno/elysia`](bruno/elysia) covers the full API: health, runs, sessions, steering, queued messages, workflow runs, cancellation, and approval decisions. Set its `baseUrl` environment variable to the running Elysia server; set `runId`, `sessionId`, `queueSessionId`, `approvalId`, `workflowName`, `workflowRunId`, and `workflowApprovalId` as you exercise the dependent requests.
 
 Then call the real agent:
 

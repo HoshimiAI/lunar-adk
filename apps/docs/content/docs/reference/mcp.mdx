@@ -1,0 +1,37 @@
+---
+title: MCP adapter
+description: Expose Lunar session queue and steering through Model Context Protocol
+---
+
+\`@lunar/mcp\` registers session operations as MCP tools on a standard MCP
+TypeScript SDK server:
+
+\`\`\`ts
+import { createLunarMcpServer } from "@lunar/mcp";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+
+const server = createLunarMcpServer(runtime, {
+  authorizeSession: async ({ sessionId }) => {
+    const session = await runtime.getSession(sessionId);
+    const activeRun = runtime.getActiveRunForSession(sessionId);
+    const owner = session ?? activeRun;
+    return owner?.tenantId === tenantId && owner.ownerId === userId;
+  },
+});
+
+await server.connect(new StdioServerTransport());
+\`\`\`
+
+The required \`authorizeSession\` callback checks access before either tool runs.
+Bind it to the authenticated MCP caller. Local stdio servers can use their
+trusted local identity. For remote clients, create the server within the
+authenticated request context and connect it through the SDK's Streamable HTTP
+handler.
+
+\`queue_message({ sessionId, message })\` runs a new user turn after earlier work
+in that session. The MCP call returns when its turn completes. \`steer_session\`
+interrupts the current turn and continues it with an instruction.
+
+Both tools use the runtime's per-session lock. Queue order is local to one
+runtime instance; this adapter does not persist pending messages across
+restarts.

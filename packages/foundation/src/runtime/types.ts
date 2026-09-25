@@ -42,6 +42,7 @@ export interface RuntimeHandle {
   reject(runId: string, approvalId: string): Promise<Run>;
   cancel(runId: string): Promise<Run | undefined>;
   getRun(runId: string): Run | undefined;
+  getActiveRunForSession(sessionId: string): Run | undefined;
   getStoredRun(runId: string): Promise<Run | undefined>;
   getSession(sessionId: string): Promise<Session | undefined>;
   getMemoryProvider(id?: string): MemoryProvider | undefined;

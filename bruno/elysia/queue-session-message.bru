@@ -1,0 +1,29 @@
+meta {
+  name: Queue session message
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/sessions/{{queueSessionId}}/queue
+  body: json
+  auth: none
+}
+
+headers {
+  content-type: application/json
+  cookie: {{sessionCookie}}
+}
+
+body:json {
+  {
+    "message": "Please answer this after the current turn completes."
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.runId: isString
+  res.body.sessionId: isString
+  res.body.output: isString
+}
