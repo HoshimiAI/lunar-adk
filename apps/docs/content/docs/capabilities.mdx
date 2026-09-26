@@ -26,6 +26,9 @@ needed.
 - Cancel active work, inspect live or persisted runs, and steer an idle or
   active session. Steering an active run produces a continuation run after the
   current tool operation finishes.
+- Queue a user message to run after earlier work in that session completes.
+  Queue ordering is local to one runtime instance; use steering to interrupt
+  active work.
 - Pause approval-required tool calls and continue them with `approve()` or
   finish them with `reject()`.
 
@@ -128,6 +131,7 @@ See [security](/docs/security), [observability](/docs/observability), and the
 | `@lunar/memory-bun-sql` | PostgreSQL full-text, tenant-scoped memory provider |
 | `@lunar/observability-otel` | Console and OTLP exporters |
 | `@lunar/auth-better-auth` | Better Auth to Lunar auth-provider adapter |
+| `@lunar/mcp` | MCP tools for queueing messages and steering sessions |
 
 The [ADK facade](/docs/reference/adk),
 [Foundation](/docs/reference/foundation), and

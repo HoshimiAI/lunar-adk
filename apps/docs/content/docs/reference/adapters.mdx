@@ -133,3 +133,15 @@ returns an `AuthPrincipal` with `subjectId`, `tenantId`, and permissions, or
 `undefined` to deny the request. The Elysia app also exports
 `createAppWithBetterAuth()` to mount the Better Auth handler and use this
 adapter together.
+
+## `createLunarMcpServer(runtime, options)`
+
+Package: `@lunar/mcp`
+
+Registers `queue_message` and `steer_session` tools on a standard MCP SDK
+server. The required `authorizeSession({ sessionId, operation })` callback
+must authorize the authenticated caller for the requested session and
+operation. The MCP host chooses its transport; queue order is held in memory
+by one runtime instance and does not survive restarts.
+
+See the [MCP adapter guide](/docs/reference/mcp) for setup and usage.
