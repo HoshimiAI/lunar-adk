@@ -1,9 +1,9 @@
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { unlinkSync } from "node:fs";
-import { createRuntime, defineAgent, defineTool, defineWorkflow } from "@lunar/foundation";
-import type { ModelProvider } from "@lunar/foundation/model";
-import { verifyStorageBundle } from "@lunar/foundation/storage/testing";
+import { createRuntime, defineAgent, defineTool, defineWorkflow } from "@lunar-adk/foundation";
+import type { ModelProvider } from "@lunar-adk/foundation/model";
+import { verifyStorageBundle } from "@lunar-adk/foundation/storage/testing";
 import { createSqliteStores, SQLITE_SCHEMA_VERSION } from "./index";
 
 test("persists runs and sessions in SQLite", async () => {

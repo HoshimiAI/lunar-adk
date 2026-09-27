@@ -1,12 +1,12 @@
-export { createRuntime } from "@lunar/foundation/runtime";
-export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "@lunar/foundation/runtime";
-export { definePlugin } from "@lunar/foundation/plugin";
-export type { Plugin, PluginContext, PluginInfo, PluginManifest, PluginPermissions, PluginStatus } from "@lunar/foundation/plugin";
-export type { AuthPrincipal, AuthProvider } from "@lunar/foundation/auth";
-export { PolicyDeniedError } from "@lunar/foundation/policy";
-export type { PolicyAction, PolicyRule } from "@lunar/foundation/policy";
+export { createRuntime } from "@lunar-adk/foundation/runtime";
+export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult } from "@lunar-adk/foundation/runtime";
+export { definePlugin } from "@lunar-adk/foundation/plugin";
+export type { Plugin, PluginContext, PluginInfo, PluginManifest, PluginPermissions, PluginStatus } from "@lunar-adk/foundation/plugin";
+export type { AuthPrincipal, AuthProvider } from "@lunar-adk/foundation/auth";
+export { PolicyDeniedError } from "@lunar-adk/foundation/policy";
+export type { PolicyAction, PolicyRule } from "@lunar-adk/foundation/policy";
 
-export { AgentRunError, defineAgent } from "@lunar/foundation/agent";
+export { AgentRunError, defineAgent } from "@lunar-adk/foundation/agent";
 export type {
   Agent,
   AgentConfig,
@@ -16,12 +16,12 @@ export type {
   AgentRunResult,
   AgentState,
   AgentErrorCode,
-} from "@lunar/foundation/agent";
+} from "@lunar-adk/foundation/agent";
 
-export { defineTool } from "@lunar/foundation/tool";
-export type { Tool, ToolResult, ToolPermission, ToolExecutionContext } from "@lunar/foundation/tool";
+export { defineTool } from "@lunar-adk/foundation/tool";
+export type { Tool, ToolResult, ToolPermission, ToolExecutionContext } from "@lunar-adk/foundation/tool";
 
-export { defineModelProvider } from "@lunar/foundation/model";
+export { defineModelProvider } from "@lunar-adk/foundation/model";
 export type {
   ModelProvider,
   ModelCapabilities,
@@ -30,24 +30,24 @@ export type {
   ModelResponse,
   ModelCallOptions,
   ModelStreamPart,
-} from "@lunar/foundation/model";
+} from "@lunar-adk/foundation/model";
 
-export type { Run, RunStatus, RunUsage, PendingApproval, RunContinuation } from "@lunar/foundation/run";
-export { InMemoryRunStore } from "@lunar/foundation/run";
-export type { RunStore } from "@lunar/foundation/run";
+export type { Run, RunStatus, RunUsage, PendingApproval, RunContinuation } from "@lunar-adk/foundation/run";
+export { InMemoryRunStore } from "@lunar-adk/foundation/run";
+export type { RunStore } from "@lunar-adk/foundation/run";
 
-export { createSession, InMemorySessionStore } from "@lunar/foundation/session";
-export type { Session, SessionStore } from "@lunar/foundation/session";
+export { createSession, InMemorySessionStore } from "@lunar-adk/foundation/session";
+export type { Session, SessionStore } from "@lunar-adk/foundation/session";
 
-export type { LunarEvent, EventName } from "@lunar/foundation/event";
-export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "@lunar/foundation/observability";
-export { StorageConflictError } from "@lunar/foundation/storage";
-export type { StorageBundle, StorageCapabilities, SaveOptions } from "@lunar/foundation/storage";
+export type { LunarEvent, EventName } from "@lunar-adk/foundation/event";
+export type { ObservabilityConfig, ObservabilityExporter, TelemetryRecord, TelemetrySpan, TelemetryStatus } from "@lunar-adk/foundation/observability";
+export { StorageConflictError } from "@lunar-adk/foundation/storage";
+export type { StorageBundle, StorageCapabilities, SaveOptions } from "@lunar-adk/foundation/storage";
 
-export { createMemory, createInMemoryProvider, MemoryRegistry } from "@lunar/foundation/memory";
-export type { EmbeddingProvider, MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery, MemoryListQuery, MemoryPage } from "@lunar/foundation/memory";
+export { createMemory, createInMemoryProvider, MemoryRegistry } from "@lunar-adk/foundation/memory";
+export type { EmbeddingProvider, MemoryCapabilities, MemoryProvider, MemoryRecord, MemoryQuery, MemoryListQuery, MemoryPage } from "@lunar-adk/foundation/memory";
 
-export { defineWorkflow, InMemoryWorkflowStore, WorkflowApprovalRequired } from "@lunar/foundation/workflow";
+export { defineWorkflow, InMemoryWorkflowStore, WorkflowApprovalRequired } from "@lunar-adk/foundation/workflow";
 export type {
   Workflow,
   WorkflowConfig,
@@ -59,4 +59,4 @@ export type {
   WorkflowApproval,
   WorkflowStore,
   ApprovalHandler,
-} from "@lunar/foundation/workflow";
+} from "@lunar-adk/foundation/workflow";

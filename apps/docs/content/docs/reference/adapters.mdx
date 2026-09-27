@@ -5,7 +5,7 @@ description: Configure model, storage, memory, auth, and telemetry adapters
 
 ## `createOpenAIModelProvider(options)`
 
-Package: `@lunar/provider-openai`
+Package: `@lunar-adk/provider-openai`
 
 Required option:
 
@@ -25,7 +25,7 @@ const model = createOpenAIModelProvider({
 
 ## `createAISDKModelProvider(options)`
 
-Package: `@lunar/provider-ai-sdk`
+Package: `@lunar-adk/provider-ai-sdk`
 
 Accepts `id`, an AI SDK `LanguageModel`, and optional capability overrides. It
 maps AI SDK text, tool calls, usage, and abort signals to the Lunar provider
@@ -33,7 +33,7 @@ contract.
 
 ## `createSqliteStores(database?)`
 
-Package: `@lunar/storage-sqlite`
+Package: `@lunar-adk/storage-sqlite`
 
 Accepts a SQLite path or Bun `Database`, defaulting to `lunar.db`. Returns:
 
@@ -48,7 +48,7 @@ The package also exports `SqliteRunStore`, `SqliteSessionStore`,
 
 ## `createSqliteMemoryProvider(database?)`
 
-Package: `@lunar/memory-sqlite`
+Package: `@lunar-adk/memory-sqlite`
 
 Creates a durable `MemoryProvider` backed by a Bun SQLite database. It
 persists memory records and implements the foundation provider's substring
@@ -57,7 +57,7 @@ retrieval and limit behavior. Pass the provider as `memory` to
 
 ## `createBunSqlMemoryProvider(options)`
 
-Package: `@lunar/memory-bun-sql`
+Package: `@lunar-adk/memory-bun-sql`
 
 Creates a PostgreSQL memory provider using Bun.SQL. Supply a `connection` URL
 or existing Bun `SQL` client and optionally an `id`. It initializes a
@@ -68,7 +68,7 @@ queries.
 
 ## `createHttpStores(options)`
 
-Package: `@lunar/storage-http`
+Package: `@lunar-adk/storage-http`
 
 Creates remote run, session, and workflow stores backed by a JSON HTTP service.
 The provider uses `PUT /v1/{resource}/:id` for idempotent saves and
@@ -80,7 +80,7 @@ retry transient network, timeout, rate-limit, and server failures.
 
 ## `createBunSqlStores(options)`
 
-Package: `@lunar/storage-bun-sql`
+Package: `@lunar-adk/storage-bun-sql`
 
 Creates the same storage bundle using Bun.SQL. Supported dialects are
 `sqlite`, `postgres`, and `mysql`; MariaDB uses the MySQL dialect. The
@@ -88,7 +88,7 @@ Creates the same storage bundle using Bun.SQL. Supported dialects are
 
 ## `createUnknownPlanetStorage(options)`
 
-Package: `@lunar/storage-unknown-planet`
+Package: `@lunar-adk/storage-unknown-planet`
 
 Creates a revision-aware `StorageBundle` from an initialized Unknown Planet
 `Planet` client and a required `scope.tenantId` (plus optional
@@ -101,7 +101,7 @@ the Elysia app's separate `MemoryProvider`.
 
 ## `createMongoStores(options)`
 
-Package: `@lunar/storage-mongo`
+Package: `@lunar-adk/storage-mongo`
 
 Accepts an application-provided Mongo database object and maps runs, sessions,
 and workflow runs to collections. Its custom collection contract uses
@@ -115,7 +115,7 @@ a compatible remote service must reject stale writes with `409` or `412`.
 Adapters expose `capabilities.atomicRunSession` so applications can distinguish
 atomic bundles from stores that persist runs and sessions separately.
 
-## `@lunar/observability-otel`
+## `@lunar-adk/observability-otel`
 
 The optional observability package exports `createConsoleExporter()` and
 `createOTLPExporter({ endpoint, headers, serviceName })`. Pass exporters through
@@ -125,7 +125,7 @@ outputs, and tool inputs.
 
 ## `createBetterAuthProvider(auth, mapPrincipal)`
 
-Package: `@lunar/auth-better-auth`
+Package: `@lunar-adk/auth-better-auth`
 
 Adapts a Better Auth-compatible `api.getSession({ headers })` implementation
 to Lunar's `AuthProvider`. `mapPrincipal` receives `{ user, session }` and
@@ -136,7 +136,7 @@ adapter together.
 
 ## `createLunarMcpServer(runtime, options)`
 
-Package: `@lunar/mcp`
+Package: `@lunar-adk/mcp`
 
 Registers `queue_message` and `steer_session` tools on a standard MCP SDK
 server. The required `authorizeSession({ sessionId, operation })` callback

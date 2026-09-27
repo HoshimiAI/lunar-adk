@@ -77,7 +77,7 @@ export function createOTLPExporter(options: OTLPExporterOptions): ObservabilityE
     export(record) {
       if (record.type !== "run" || !record.run?.trace.length) return;
       const body = JSON.stringify({
-        resourceSpans: [{ resource, scopeSpans: [{ scope: { name: "@lunar/observability-otel" }, spans: record.run.trace.map(toOTLPSpan) }] }],
+        resourceSpans: [{ resource, scopeSpans: [{ scope: { name: "@lunar-adk/observability-otel" }, spans: record.run.trace.map(toOTLPSpan) }] }],
       });
       pending = pending.then(async () => {
         const response = await send(options.endpoint, {

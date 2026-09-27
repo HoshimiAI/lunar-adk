@@ -3,7 +3,7 @@ title: "Use case: Unknown Planet storage"
 description: Persist runs, sessions, and workflows in scoped PostgreSQL storage
 ---
 
-Use `@lunar/storage-unknown-planet` when runs, sessions, and workflow state
+Use `@lunar-adk/storage-unknown-planet` when runs, sessions, and workflow state
 must survive process restarts in PostgreSQL while remaining scoped to a Planet
 tenant or workspace. The adapter uses PostgreSQL transactions and
 revision-aware writes; its storage bundle atomically saves a run with its
@@ -16,11 +16,11 @@ migration before serving traffic, and construct storage with the scope for the
 authenticated tenant:
 
 ```ts
-import { createRuntime } from '@lunar/adk';
+import { createRuntime } from '@lunar-adk/adk';
 import {
   createUnknownPlanetStorage,
   migrateUnknownPlanetStorage,
-} from '@lunar/storage-unknown-planet';
+} from '@lunar-adk/storage-unknown-planet';
 
 await migrateUnknownPlanetStorage({ planet });
 const storage = createUnknownPlanetStorage({

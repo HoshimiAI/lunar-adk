@@ -1,4 +1,4 @@
-import { definePlugin, defineTool, defineWorkflow } from "@lunar/adk";
+import { definePlugin, defineTool, defineWorkflow } from "@lunar-adk/adk";
 
 interface GreetInput {
   name: string;

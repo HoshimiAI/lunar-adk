@@ -1,5 +1,5 @@
 {
-  "name": "@lunar/elysia-app",
+  "name": "@lunar-adk/elysia-app",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,17 +12,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lunar/adk": "workspace:*",
-    "@lunar/provider-openai": "workspace:*",
-    "@lunar/storage-sqlite": "workspace:*",
-    "@lunar/storage-http": "workspace:*",
-    "@lunar/storage-bun-sql": "workspace:*",
-    "@lunar/storage-unknown-planet": "workspace:*",
+    "@lunar-adk/adk": "workspace:*",
+    "@lunar-adk/provider-openai": "workspace:*",
+    "@lunar-adk/storage-sqlite": "workspace:*",
+    "@lunar-adk/storage-http": "workspace:*",
+    "@lunar-adk/storage-bun-sql": "workspace:*",
+    "@lunar-adk/storage-unknown-planet": "workspace:*",
     "@unknown-planet/sdk": "^1.1.0",
-    "@lunar/memory-bun-sql": "workspace:*",
-    "@lunar/auth-better-auth": "workspace:*",
+    "@lunar-adk/memory-bun-sql": "workspace:*",
+    "@lunar-adk/auth-better-auth": "workspace:*",
     "better-auth": "^1.6.0",
-    "@lunar/observability-otel": "workspace:*",
+    "@lunar-adk/observability-otel": "workspace:*",
     "elysia": "latest"
   }
 }

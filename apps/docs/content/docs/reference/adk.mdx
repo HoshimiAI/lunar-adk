@@ -1,11 +1,11 @@
 ---
-title: "API: @lunar/adk"
+title: "API: @lunar-adk/adk"
 description: Stable application-facing Lunar ADK exports
 ---
 
 The stable facade re-exports the APIs most applications need, including memory,
 workflows, and plugins. Evaluation APIs remain experimental and are exported
-from `@lunar/adk/experimental`.
+from `@lunar-adk/adk/experimental`.
 
 | Export | Purpose |
 | --- | --- |
@@ -118,14 +118,14 @@ The facade exports `Agent`, `AgentConfig`, `AgentHooks`, `AgentRunOptions`, `Age
 `Run`, `Session`, `Workflow`, `WorkflowRun`, and their related status and store
 types. See the concept guides for behavior and examples.
 
-## `@lunar/adk/experimental`
+## `@lunar-adk/adk/experimental`
 
 This subpath exposes the currently experimental evaluation surface:
 
 - `defineEvaluator` and the `Evaluator` and `EvaluationScore` types;
 
 Plugin exports remain available from this subpath for source compatibility, but
-are deprecated. Import them from `@lunar/adk` instead.
+are deprecated. Import them from `@lunar-adk/adk` instead.
 
 For all underlying helpers and subpath modules, use the
 [Foundation reference](/docs/reference/foundation).

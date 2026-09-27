@@ -24,7 +24,7 @@ Use an authenticated app when exposing the service through a public listener
 or reverse proxy. HTTP run and workflow responses redact internal failure
 messages; the runtime and persisted records retain them for operators.
 
-`@lunar/auth-better-auth` provides `createBetterAuthProvider()` for Better Auth
+`@lunar-adk/auth-better-auth` provides `createBetterAuthProvider()` for Better Auth
 sessions. The application maps a verified Better Auth user/session to Lunar's
 tenant and permission model. Curated memory endpoints require `memory:read`,
 `memory:write`, or `memory:delete` permissions.

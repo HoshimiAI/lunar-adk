@@ -1,10 +1,10 @@
-# @lunar/mcp
+# @lunar-adk/mcp
 
 MCP tools for queueing messages and steering sessions managed by a Lunar
 `RuntimeHandle`.
 
 ```ts
-import { createLunarMcpServer } from "@lunar/mcp";
+import { createLunarMcpServer } from "@lunar-adk/mcp";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 
 const server = createLunarMcpServer(runtime, {

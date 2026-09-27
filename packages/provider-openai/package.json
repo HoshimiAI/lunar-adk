@@ -1,5 +1,5 @@
 {
-  "name": "@lunar/provider-openai",
+  "name": "@lunar-adk/provider-openai",
   "version": "1.1.0",
   "type": "module",
   "exports": {
@@ -12,10 +12,10 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.71",
-    "@lunar/foundation": "workspace:*",
-    "@lunar/provider-ai-sdk": "workspace:*"
+    "@lunar-adk/foundation": "workspace:*",
+    "@lunar-adk/provider-ai-sdk": "workspace:*"
   },
   "devDependencies": {
-    "@lunar/adk": "workspace:*"
+    "@lunar-adk/adk": "workspace:*"
   }
 }

@@ -4,11 +4,11 @@ description: Complete feature and package inventory for Lunar ADK
 ---
 
 This page is the product-level map of shipped Lunar ADK capabilities. Use
-`@lunar/adk` for application code, `@lunar/foundation` subpaths for advanced
+`@lunar-adk/adk` for application code, `@lunar-adk/foundation` subpaths for advanced
 integrations, and the separate adapter packages for external systems.
 
 Lunar Foundation defines the contracts for agents, models, tools, workflows,
-events, storage, and memory. `@lunar/adk` is the stable application facade;
+events, storage, and memory. `@lunar-adk/adk` is the stable application facade;
 provider and persistence packages implement those contracts without coupling
 the runtime to a specific vendor or database. The runtime uses in-memory stores
 by default and accepts storage bundles and memory providers when durability is
@@ -117,21 +117,21 @@ See [security](/docs/security), [observability](/docs/observability), and the
 
 | Package | Capability |
 | --- | --- |
-| `@lunar/adk` | Stable application facade for runtime, agents, tools, models, runs, sessions, memory, workflows, plugins, storage types, and auth/telemetry types |
-| `@lunar/adk/experimental` | Experimental evaluation APIs; plugin exports are deprecated compatibility aliases |
-| `@lunar/foundation` | Provider-neutral runtime contracts and helpers; advanced modules are exported from subpaths |
-| `@lunar/provider-openai` | OpenAI model provider factory |
-| `@lunar/provider-ai-sdk` | Generic AI SDK model provider factory |
-| `@lunar/storage-sqlite` | Bun SQLite storage bundle |
-| `@lunar/storage-bun-sql` | Bun.SQL SQLite, PostgreSQL, and MySQL storage bundle |
-| `@lunar/storage-unknown-planet` | Scoped PostgreSQL storage and memory adapters for Unknown Planet |
-| `@lunar/storage-http` | Revision-aware remote HTTP storage bundle |
-| `@lunar/storage-mongo` | MongoDB collection-contract storage bundle |
-| `@lunar/memory-sqlite` | Bun SQLite memory provider |
-| `@lunar/memory-bun-sql` | PostgreSQL full-text, tenant-scoped memory provider |
-| `@lunar/observability-otel` | Console and OTLP exporters |
-| `@lunar/auth-better-auth` | Better Auth to Lunar auth-provider adapter |
-| `@lunar/mcp` | MCP tools for queueing messages and steering sessions |
+| `@lunar-adk/adk` | Stable application facade for runtime, agents, tools, models, runs, sessions, memory, workflows, plugins, storage types, and auth/telemetry types |
+| `@lunar-adk/adk/experimental` | Experimental evaluation APIs; plugin exports are deprecated compatibility aliases |
+| `@lunar-adk/foundation` | Provider-neutral runtime contracts and helpers; advanced modules are exported from subpaths |
+| `@lunar-adk/provider-openai` | OpenAI model provider factory |
+| `@lunar-adk/provider-ai-sdk` | Generic AI SDK model provider factory |
+| `@lunar-adk/storage-sqlite` | Bun SQLite storage bundle |
+| `@lunar-adk/storage-bun-sql` | Bun.SQL SQLite, PostgreSQL, and MySQL storage bundle |
+| `@lunar-adk/storage-unknown-planet` | Scoped PostgreSQL storage and memory adapters for Unknown Planet |
+| `@lunar-adk/storage-http` | Revision-aware remote HTTP storage bundle |
+| `@lunar-adk/storage-mongo` | MongoDB collection-contract storage bundle |
+| `@lunar-adk/memory-sqlite` | Bun SQLite memory provider |
+| `@lunar-adk/memory-bun-sql` | PostgreSQL full-text, tenant-scoped memory provider |
+| `@lunar-adk/observability-otel` | Console and OTLP exporters |
+| `@lunar-adk/auth-better-auth` | Better Auth to Lunar auth-provider adapter |
+| `@lunar-adk/mcp` | MCP tools for queueing messages and steering sessions |
 
 The [ADK facade](/docs/reference/adk),
 [Foundation](/docs/reference/foundation), and

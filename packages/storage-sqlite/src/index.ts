@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { StorageConflictError, type Run, type RunStore, type Session, type SessionStore, type StorageBundle, type WorkflowRun, type WorkflowStore, type SaveOptions } from "@lunar/foundation";
+import { StorageConflictError, type Run, type RunStore, type Session, type SessionStore, type StorageBundle, type WorkflowRun, type WorkflowStore, type SaveOptions } from "@lunar-adk/foundation";
 
 export const SQLITE_SCHEMA_VERSION = 2;
 

@@ -9,20 +9,20 @@ Lunar ADK targets Bun and TypeScript. Install the stable application-facing
 package in an existing project:
 
 ```bash
-bun add @lunar/adk
+bun add @lunar-adk/adk
 ```
 
 For the OpenAI adapter, also install:
 
 ```bash
-bun add @lunar/provider-openai
+bun add @lunar-adk/provider-openai
 ```
 
 ## Create a runtime
 
 ```ts
-import { createRuntime, defineAgent } from '@lunar/adk';
-import { createOpenAIModelProvider } from '@lunar/provider-openai';
+import { createRuntime, defineAgent } from '@lunar-adk/adk';
+import { createOpenAIModelProvider } from '@lunar-adk/provider-openai';
 
 const runtime = await createRuntime();
 runtime.registerAgent(defineAgent({

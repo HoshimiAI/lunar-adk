@@ -37,7 +37,7 @@
 
 ## 1.0.0
 
-- Added the stable `@lunar/adk` public facade.
+- Added the stable `@lunar-adk/adk` public facade.
 - Added provider-neutral agent, tool, model, run, and session runtime contracts.
 - Added OpenAI integration through the AI SDK.
 - Added durable SQLite run and session storage.

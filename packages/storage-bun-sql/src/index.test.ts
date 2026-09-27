@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createBunSqlStores } from "./index";
-import { verifyStorageBundle } from "@lunar/foundation/storage/testing";
+import { verifyStorageBundle } from "@lunar-adk/foundation/storage/testing";
 
 test("stores records in Bun.SQL SQLite mode", async () => {
   const stores = await createBunSqlStores({ connection: ":memory:", dialect: "sqlite" });

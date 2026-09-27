@@ -1,4 +1,4 @@
-import type { AuthPrincipal, ObservabilityExporter, Run, TelemetryRecord } from "@lunar/adk";
+import type { AuthPrincipal, ObservabilityExporter, Run, TelemetryRecord } from "@lunar-adk/adk";
 
 const MAX_RUNS = 100;
 

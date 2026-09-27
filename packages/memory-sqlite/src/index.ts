@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { MemoryProvider, MemoryQuery, MemoryRecord } from "@lunar/foundation/memory";
+import type { MemoryProvider, MemoryQuery, MemoryRecord } from "@lunar-adk/foundation/memory";
 
 const MEMORY_SCHEMA = `
   CREATE TABLE IF NOT EXISTS lunar_memories (

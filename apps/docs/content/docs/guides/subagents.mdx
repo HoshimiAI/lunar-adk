@@ -13,7 +13,7 @@ the workflow run, forwards workflow cancellation, and saves its ID in
 Register each specialist before registering the workflow, then call it by name:
 
 ```ts
-import { createRuntime, defineAgent, defineWorkflow } from '@lunar/adk';
+import { createRuntime, defineAgent, defineWorkflow } from '@lunar-adk/adk';
 
 const runtime = await createRuntime();
 
@@ -91,7 +91,7 @@ runner handles that error itself.
 ## Workflow boundaries
 
 Managed subagents are a workflow feature. The lower-level
-`runSubAgent(agent, input, options?)` helper from `@lunar/foundation/agent`
+`runSubAgent(agent, input, options?)` helper from `@lunar-adk/foundation/agent`
 simply invokes an `Agent`; it does not automatically create workflow ownership
 or append a child ID. Prefer `ctx.runSubAgent()` whenever the delegation is
 part of a workflow.

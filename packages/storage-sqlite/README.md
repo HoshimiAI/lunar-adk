@@ -1,9 +1,9 @@
-# @lunar/storage-sqlite
+# @lunar-adk/storage-sqlite
 
 SQLite implementations of the foundation run and session storage ports.
 
 ```ts
-import { createSqliteStores } from "@lunar/storage-sqlite";
+import { createSqliteStores } from "@lunar-adk/storage-sqlite";
 
 const storage = createSqliteStores("lunar.db");
 ```

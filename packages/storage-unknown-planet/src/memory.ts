@@ -1,4 +1,4 @@
-import type { MemoryListQuery, MemoryPage, MemoryProvider, MemoryQuery, MemoryRecord } from "@lunar/foundation/memory";
+import type { MemoryListQuery, MemoryPage, MemoryProvider, MemoryQuery, MemoryRecord } from "@lunar-adk/foundation/memory";
 import type { AddMemoryInput, JsonObject, MemoryRecord as PlanetMemoryRecord, Planet, PlanetScope } from "@unknown-planet/sdk";
 
 const DEFAULT_PROVIDER_ID = "unknown-planet";

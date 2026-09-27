@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createRuntime, defineAgent, definePlugin, defineTool, defineWorkflow, InMemoryWorkflowStore } from "@lunar/adk";
-import type { MemoryProvider, ModelProvider } from "@lunar/adk";
+import { createRuntime, defineAgent, definePlugin, defineTool, defineWorkflow, InMemoryWorkflowStore } from "@lunar-adk/adk";
+import type { MemoryProvider, ModelProvider } from "@lunar-adk/adk";
 import { createApp, createAppWithBetterAuth, createDefaultApp, createInMemoryRateLimitStore } from "./app";
 import { calculatorTool, currentTimeTool } from "./tools";
 

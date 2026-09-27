@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createRuntime, defineAgent } from "@lunar/adk";
+import { createRuntime, defineAgent } from "@lunar-adk/adk";
 import { createOpenAIModelProvider } from "./index";
 
 const liveTest = process.env.RUN_LIVE_TESTS === "1" && Boolean(process.env.OPENAI_API_KEY)

@@ -6,18 +6,18 @@ Release status: v1.2 code-first workflows and managed subagents.
 
 ## Packages
 
-- [`packages/adk`](packages/adk) — `@lunar/adk`, the stable public facade for application developers.
-- [`packages/foundation`](packages/foundation) — `@lunar/foundation`, the provider-neutral agent runtime and core contracts.
-- [`packages/provider-ai-sdk`](packages/provider-ai-sdk) — `@lunar/provider-ai-sdk`, an AI SDK adapter for foundation model providers.
-- [`packages/provider-openai`](packages/provider-openai) — `@lunar/provider-openai`, an OpenAI model adapter built on the AI SDK.
-- [`packages/storage-sqlite`](packages/storage-sqlite) — `@lunar/storage-sqlite`, durable SQLite run and session storage.
-- [`packages/storage-http`](packages/storage-http) — `@lunar/storage-http`, remote HTTP run, session, and workflow storage.
-- [`packages/storage-bun-sql`](packages/storage-bun-sql) — `@lunar/storage-bun-sql`, Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
-- [`packages/storage-mongo`](packages/storage-mongo) — `@lunar/storage-mongo`, MongoDB collection adapter using an application-provided Mongo SDK client.
-- [`packages/storage-unknown-planet`](packages/storage-unknown-planet) — `@lunar/storage-unknown-planet`, run/session/workflow storage and scoped memory for Unknown Planet.
-- [`packages/mcp`](packages/mcp) — `@lunar/mcp`, MCP tools for queueing and steering session messages.
-- [`packages/memory-sqlite`](packages/memory-sqlite) — `@lunar/memory-sqlite`, durable SQLite memory records.
-- [`packages/observability-otel`](packages/observability-otel) — `@lunar/observability-otel`, console and OTLP telemetry exporters.
+- [`packages/adk`](packages/adk) — `@lunar-adk/adk`, the stable public facade for application developers.
+- [`packages/foundation`](packages/foundation) — `@lunar-adk/foundation`, the provider-neutral agent runtime and core contracts.
+- [`packages/provider-ai-sdk`](packages/provider-ai-sdk) — `@lunar-adk/provider-ai-sdk`, an AI SDK adapter for foundation model providers.
+- [`packages/provider-openai`](packages/provider-openai) — `@lunar-adk/provider-openai`, an OpenAI model adapter built on the AI SDK.
+- [`packages/storage-sqlite`](packages/storage-sqlite) — `@lunar-adk/storage-sqlite`, durable SQLite run and session storage.
+- [`packages/storage-http`](packages/storage-http) — `@lunar-adk/storage-http`, remote HTTP run, session, and workflow storage.
+- [`packages/storage-bun-sql`](packages/storage-bun-sql) — `@lunar-adk/storage-bun-sql`, Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
+- [`packages/storage-mongo`](packages/storage-mongo) — `@lunar-adk/storage-mongo`, MongoDB collection adapter using an application-provided Mongo SDK client.
+- [`packages/storage-unknown-planet`](packages/storage-unknown-planet) — `@lunar-adk/storage-unknown-planet`, run/session/workflow storage and scoped memory for Unknown Planet.
+- [`packages/mcp`](packages/mcp) — `@lunar-adk/mcp`, MCP tools for queueing and steering session messages.
+- [`packages/memory-sqlite`](packages/memory-sqlite) — `@lunar-adk/memory-sqlite`, durable SQLite memory records.
+- [`packages/observability-otel`](packages/observability-otel) — `@lunar-adk/observability-otel`, console and OTLP telemetry exporters.
 - [`apps/elysia`](apps/elysia) — API-only Elysia HTTP adapter and runnable application.
 
 ## Install

@@ -3,11 +3,11 @@ title: MCP adapter
 description: Expose Lunar session queue and steering through Model Context Protocol
 ---
 
-`@lunar/mcp` registers session operations as MCP tools on a standard MCP
+`@lunar-adk/mcp` registers session operations as MCP tools on a standard MCP
 TypeScript SDK server:
 
 ```ts
-import { createLunarMcpServer } from "@lunar/mcp";
+import { createLunarMcpServer } from "@lunar-adk/mcp";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 
 const server = createLunarMcpServer(runtime, {

@@ -12,11 +12,11 @@ if (published.length === 0) throw new Error("No publishable packages found");
 
 const versions = new Set<string>();
 for (const { path, manifest } of published) {
-  if (!manifest.name?.startsWith("@lunar/")) throw new Error(`${path} must use an @lunar package name`);
+  if (!manifest.name?.startsWith("@lunar-adk/")) throw new Error(`${path} must use an @lunar package name`);
   if (!manifest.version || !semver.test(manifest.version)) throw new Error(`${path} has an invalid semantic version`);
   versions.add(manifest.version);
   for (const [dependency, range] of Object.entries(manifest.dependencies ?? {})) {
-    if (dependency.startsWith("@lunar/") && range !== "workspace:*") {
+    if (dependency.startsWith("@lunar-adk/") && range !== "workspace:*") {
       throw new Error(`${path} must use workspace:* for ${dependency}`);
     }
   }

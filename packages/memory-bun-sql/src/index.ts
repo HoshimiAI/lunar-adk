@@ -1,5 +1,5 @@
 import { SQL } from "bun";
-import type { MemoryListQuery, MemoryPage, MemoryProvider, MemoryQuery, MemoryRecord } from "@lunar/foundation/memory";
+import type { MemoryListQuery, MemoryPage, MemoryProvider, MemoryQuery, MemoryRecord } from "@lunar-adk/foundation/memory";
 
 export interface BunSqlMemoryOptions {
   connection: string | SQL;

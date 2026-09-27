@@ -1,4 +1,4 @@
-import { createRuntime } from "@lunar/adk";
+import { createRuntime } from "@lunar-adk/adk";
 import { createApp } from "./app";
 import { greetingPlugin } from "./plugins/greeting-plugin";
 

@@ -1,9 +1,9 @@
-# @lunar/provider-openai
+# @lunar-adk/provider-openai
 
 OpenAI provider for Lunar ADK, implemented through the AI SDK.
 
 ```ts
-import { createOpenAIModelProvider } from "@lunar/provider-openai";
+import { createOpenAIModelProvider } from "@lunar-adk/provider-openai";
 
 const model = createOpenAIModelProvider({
   model: "gpt-5-mini",

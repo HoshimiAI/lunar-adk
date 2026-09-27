@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import type { RuntimeHandle } from "@lunar/foundation";
+import type { RuntimeHandle } from "@lunar-adk/foundation";
 
 export type LunarMcpOperation = "queue_message" | "steer_session";
 

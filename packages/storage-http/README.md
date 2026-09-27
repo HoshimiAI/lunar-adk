@@ -1,9 +1,9 @@
-# @lunar/storage-http
+# @lunar-adk/storage-http
 
 HTTP implementations of the Lunar run, session, and workflow storage ports.
 
 ```ts
-import { createHttpStores } from "@lunar/storage-http";
+import { createHttpStores } from "@lunar-adk/storage-http";
 
 const storage = createHttpStores({
   baseUrl: process.env.STORAGE_HTTP_BASE_URL!,

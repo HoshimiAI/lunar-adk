@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createHttpStores, HttpStorageError } from "./index";
-import { verifyStorageBundle } from "@lunar/foundation/storage/testing";
+import { verifyStorageBundle } from "@lunar-adk/foundation/storage/testing";
 
 test("persists and reads records through the HTTP contract", async () => {
   const records = new Map<string, unknown>();

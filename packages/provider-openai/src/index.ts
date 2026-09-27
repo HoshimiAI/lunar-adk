@@ -1,7 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { createAISDKModelProvider } from "@lunar/provider-ai-sdk";
-import type { ModelProvider } from "@lunar/foundation/model";
-import type { EmbeddingProvider } from "@lunar/foundation/memory";
+import { createAISDKModelProvider } from "@lunar-adk/provider-ai-sdk";
+import type { ModelProvider } from "@lunar-adk/foundation/model";
+import type { EmbeddingProvider } from "@lunar-adk/foundation/memory";
 
 export interface OpenAIModelProviderOptions {
   model: string;

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createMongoStores, type MongoCollection, type MongoDatabase } from "./index";
-import { verifyStorageBundle } from "@lunar/foundation/storage/testing";
+import { verifyStorageBundle } from "@lunar-adk/foundation/storage/testing";
 
 test("maps stores to Mongo collections with revision-safe semantics", async () => {
   const data = new Map<string, Map<string, unknown>>();

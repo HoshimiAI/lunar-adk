@@ -1,7 +1,7 @@
 import { SQL } from "bun";
 import { expect, test } from "bun:test";
-import { StorageConflictError, type Run, type Session } from "@lunar/foundation";
-import { verifyStorageBundle } from "@lunar/foundation/storage/testing";
+import { StorageConflictError, type Run, type Session } from "@lunar-adk/foundation";
+import { verifyStorageBundle } from "@lunar-adk/foundation/storage/testing";
 import { Planet, type SqlStore } from "@unknown-planet/sdk";
 import { createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "./index.js";
 

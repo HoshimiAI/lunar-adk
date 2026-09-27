@@ -36,126 +36,126 @@
       },
     },
     "apps/elysia": {
-      "name": "@lunar/elysia-app",
+      "name": "@lunar-adk/elysia-app",
       "dependencies": {
-        "@lunar/adk": "workspace:*",
-        "@lunar/auth-better-auth": "workspace:*",
-        "@lunar/memory-bun-sql": "workspace:*",
-        "@lunar/observability-otel": "workspace:*",
-        "@lunar/provider-openai": "workspace:*",
-        "@lunar/storage-bun-sql": "workspace:*",
-        "@lunar/storage-http": "workspace:*",
-        "@lunar/storage-sqlite": "workspace:*",
-        "@lunar/storage-unknown-planet": "workspace:*",
+        "@lunar-adk/adk": "workspace:*",
+        "@lunar-adk/auth-better-auth": "workspace:*",
+        "@lunar-adk/memory-bun-sql": "workspace:*",
+        "@lunar-adk/observability-otel": "workspace:*",
+        "@lunar-adk/provider-openai": "workspace:*",
+        "@lunar-adk/storage-bun-sql": "workspace:*",
+        "@lunar-adk/storage-http": "workspace:*",
+        "@lunar-adk/storage-sqlite": "workspace:*",
+        "@lunar-adk/storage-unknown-planet": "workspace:*",
         "@unknown-planet/sdk": "^1.1.0",
         "better-auth": "^1.6.0",
         "elysia": "latest",
       },
     },
     "packages/adk": {
-      "name": "@lunar/adk",
+      "name": "@lunar-adk/adk",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/auth-better-auth": {
-      "name": "@lunar/auth-better-auth",
+      "name": "@lunar-adk/auth-better-auth",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
       "peerDependencies": {
         "better-auth": ">=1.0.0",
       },
     },
     "packages/foundation": {
-      "name": "@lunar/foundation",
+      "name": "@lunar-adk/foundation",
       "version": "1.1.0",
     },
     "packages/mcp": {
-      "name": "@lunar/mcp",
+      "name": "@lunar-adk/mcp",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
         "@modelcontextprotocol/server": "^2.0.0",
         "zod": "^4.0.0",
       },
     },
     "packages/memory-bun-sql": {
-      "name": "@lunar/memory-bun-sql",
+      "name": "@lunar-adk/memory-bun-sql",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/memory-sqlite": {
-      "name": "@lunar/memory-sqlite",
+      "name": "@lunar-adk/memory-sqlite",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/observability-otel": {
-      "name": "@lunar/observability-otel",
+      "name": "@lunar-adk/observability-otel",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/provider-ai-sdk": {
-      "name": "@lunar/provider-ai-sdk",
+      "name": "@lunar-adk/provider-ai-sdk",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
         "ai": "7.0.107",
       },
     },
     "packages/provider-openai": {
-      "name": "@lunar/provider-openai",
+      "name": "@lunar-adk/provider-openai",
       "version": "1.1.0",
       "dependencies": {
         "@ai-sdk/openai": "4.0.71",
-        "@lunar/foundation": "workspace:*",
-        "@lunar/provider-ai-sdk": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
+        "@lunar-adk/provider-ai-sdk": "workspace:*",
       },
       "devDependencies": {
-        "@lunar/adk": "workspace:*",
+        "@lunar-adk/adk": "workspace:*",
       },
     },
     "packages/storage-bun-sql": {
-      "name": "@lunar/storage-bun-sql",
+      "name": "@lunar-adk/storage-bun-sql",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/storage-http": {
-      "name": "@lunar/storage-http",
+      "name": "@lunar-adk/storage-http",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/storage-mongo": {
-      "name": "@lunar/storage-mongo",
+      "name": "@lunar-adk/storage-mongo",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/storage-sqlite": {
-      "name": "@lunar/storage-sqlite",
+      "name": "@lunar-adk/storage-sqlite",
       "version": "1.1.0",
       "dependencies": {
-        "@lunar/foundation": "workspace:*",
+        "@lunar-adk/foundation": "workspace:*",
       },
     },
     "packages/storage-unknown-planet": {
-      "name": "@lunar/storage-unknown-planet",
+      "name": "@lunar-adk/storage-unknown-planet",
       "version": "1.1.0",
       "peerDependencies": {
-        "@lunar/foundation": "^1.0.0",
+        "@lunar-adk/foundation": "^1.0.0",
         "@unknown-planet/sdk": "^1.1.0",
       },
     },
@@ -393,35 +393,35 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@lunar/adk": ["@lunar/adk@workspace:packages/adk"],
+    "@lunar-adk/adk": ["@lunar-adk/adk@workspace:packages/adk"],
 
-    "@lunar/auth-better-auth": ["@lunar/auth-better-auth@workspace:packages/auth-better-auth"],
+    "@lunar-adk/auth-better-auth": ["@lunar-adk/auth-better-auth@workspace:packages/auth-better-auth"],
 
-    "@lunar/elysia-app": ["@lunar/elysia-app@workspace:apps/elysia"],
+    "@lunar-adk/elysia-app": ["@lunar-adk/elysia-app@workspace:apps/elysia"],
 
-    "@lunar/foundation": ["@lunar/foundation@workspace:packages/foundation"],
+    "@lunar-adk/foundation": ["@lunar-adk/foundation@workspace:packages/foundation"],
 
-    "@lunar/mcp": ["@lunar/mcp@workspace:packages/mcp"],
+    "@lunar-adk/mcp": ["@lunar-adk/mcp@workspace:packages/mcp"],
 
-    "@lunar/memory-bun-sql": ["@lunar/memory-bun-sql@workspace:packages/memory-bun-sql"],
+    "@lunar-adk/memory-bun-sql": ["@lunar-adk/memory-bun-sql@workspace:packages/memory-bun-sql"],
 
-    "@lunar/memory-sqlite": ["@lunar/memory-sqlite@workspace:packages/memory-sqlite"],
+    "@lunar-adk/memory-sqlite": ["@lunar-adk/memory-sqlite@workspace:packages/memory-sqlite"],
 
-    "@lunar/observability-otel": ["@lunar/observability-otel@workspace:packages/observability-otel"],
+    "@lunar-adk/observability-otel": ["@lunar-adk/observability-otel@workspace:packages/observability-otel"],
 
-    "@lunar/provider-ai-sdk": ["@lunar/provider-ai-sdk@workspace:packages/provider-ai-sdk"],
+    "@lunar-adk/provider-ai-sdk": ["@lunar-adk/provider-ai-sdk@workspace:packages/provider-ai-sdk"],
 
-    "@lunar/provider-openai": ["@lunar/provider-openai@workspace:packages/provider-openai"],
+    "@lunar-adk/provider-openai": ["@lunar-adk/provider-openai@workspace:packages/provider-openai"],
 
-    "@lunar/storage-bun-sql": ["@lunar/storage-bun-sql@workspace:packages/storage-bun-sql"],
+    "@lunar-adk/storage-bun-sql": ["@lunar-adk/storage-bun-sql@workspace:packages/storage-bun-sql"],
 
-    "@lunar/storage-http": ["@lunar/storage-http@workspace:packages/storage-http"],
+    "@lunar-adk/storage-http": ["@lunar-adk/storage-http@workspace:packages/storage-http"],
 
-    "@lunar/storage-mongo": ["@lunar/storage-mongo@workspace:packages/storage-mongo"],
+    "@lunar-adk/storage-mongo": ["@lunar-adk/storage-mongo@workspace:packages/storage-mongo"],
 
-    "@lunar/storage-sqlite": ["@lunar/storage-sqlite@workspace:packages/storage-sqlite"],
+    "@lunar-adk/storage-sqlite": ["@lunar-adk/storage-sqlite@workspace:packages/storage-sqlite"],
 
-    "@lunar/storage-unknown-planet": ["@lunar/storage-unknown-planet@workspace:packages/storage-unknown-planet"],
+    "@lunar-adk/storage-unknown-planet": ["@lunar-adk/storage-unknown-planet@workspace:packages/storage-unknown-planet"],
 
     "@mdx-js/mdx": ["@mdx-js/mdx@3.1.1", "", { "dependencies": { "@types/estree": "^1.0.0", "@types/estree-jsx": "^1.0.0", "@types/hast": "^3.0.0", "@types/mdx": "^2.0.0", "acorn": "^8.0.0", "collapse-white-space": "^2.0.0", "devlop": "^1.0.0", "estree-util-is-identifier-name": "^3.0.0", "estree-util-scope": "^1.0.0", "estree-walker": "^3.0.0", "hast-util-to-jsx-runtime": "^2.0.0", "markdown-extensions": "^2.0.0", "recma-build-jsx": "^1.0.0", "recma-jsx": "^1.0.0", "recma-stringify": "^1.0.0", "rehype-recma": "^1.0.0", "remark-mdx": "^3.0.0", "remark-parse": "^11.0.0", "remark-rehype": "^11.0.0", "source-map": "^0.7.0", "unified": "^11.0.0", "unist-util-position-from-estree": "^2.0.0", "unist-util-stringify-position": "^4.0.0", "unist-util-visit": "^5.0.0", "vfile": "^6.0.0" } }, "sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ=="],
 

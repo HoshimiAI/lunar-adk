@@ -1,4 +1,4 @@
-import { defineTool, defineWorkflow, type AuthProvider } from "@lunar/adk";
+import { defineTool, defineWorkflow, type AuthProvider } from "@lunar-adk/adk";
 import { createDefaultApp } from "./app";
 
 const token = process.env.LIVE_TEST_BEARER_TOKEN;

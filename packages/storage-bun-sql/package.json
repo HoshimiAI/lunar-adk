@@ -1,8 +1,8 @@
 {
-  "name": "@lunar/storage-bun-sql",
+  "name": "@lunar-adk/storage-bun-sql",
   "version": "1.1.0",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "test": "bun test", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@lunar/foundation": "workspace:*" }
+  "dependencies": { "@lunar-adk/foundation": "workspace:*" }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@lunar/foundation",
+  "name": "@lunar-adk/foundation",
   "version": "1.1.0",
   "type": "module",
   "exports": {

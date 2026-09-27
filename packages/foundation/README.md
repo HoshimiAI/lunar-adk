@@ -1,4 +1,4 @@
-# @lunar/foundation
+# @lunar-adk/foundation
 
 Domain-agnostic agent runtime. Provides capabilities (agent, tool, model,
 memory, context, workflow, run, event, plugin, session, evaluation);
@@ -24,10 +24,10 @@ plugin packages that depend on this one — never the reverse.
 ## Public API
 
 ```ts
-import { createRuntime, defineAgent, defineTool, definePlugin, defineWorkflow, createMemory } from "@lunar/foundation";
+import { createRuntime, defineAgent, defineTool, definePlugin, defineWorkflow, createMemory } from "@lunar-adk/foundation";
 ```
 
-Subpath exports (`@lunar/foundation/agent`, `/tool`, `/plugin`, ...) expose only stable per-feature APIs — see `package.json` `exports`.
+Subpath exports (`@lunar-adk/foundation/agent`, `/tool`, `/plugin`, ...) expose only stable per-feature APIs — see `package.json` `exports`.
 
 ## Examples
 

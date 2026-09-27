@@ -1,5 +1,5 @@
 {
-  "name": "@lunar/adk",
+  "name": "@lunar-adk/adk",
   "version": "1.1.0",
   "type": "module",
   "exports": {
@@ -11,6 +11,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lunar/foundation": "workspace:*"
+    "@lunar-adk/foundation": "workspace:*"
   }
 }

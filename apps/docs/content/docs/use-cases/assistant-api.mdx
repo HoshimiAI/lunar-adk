@@ -10,9 +10,9 @@ session inspection, cancellation, and optional authentication.
 ## Runtime setup
 
 ```ts
-import { createRuntime, defineAgent } from '@lunar/adk';
-import { createOpenAIModelProvider } from '@lunar/provider-openai';
-import { createSqliteStores } from '@lunar/storage-sqlite';
+import { createRuntime, defineAgent } from '@lunar-adk/adk';
+import { createOpenAIModelProvider } from '@lunar-adk/provider-openai';
+import { createSqliteStores } from '@lunar-adk/storage-sqlite';
 
 const storage = createSqliteStores(process.env.SQLITE_PATH ?? 'lunar.db');
 const runtime = await createRuntime({

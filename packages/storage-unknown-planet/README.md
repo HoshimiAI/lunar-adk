@@ -1,9 +1,9 @@
 # Lunar storage through Unknown Planet
 
-`@lunar/storage-unknown-planet` implements Lunar's `StorageBundle` with a scoped Unknown Planet `Planet` client. Its SQL capability must use PostgreSQL transactions.
+`@lunar-adk/storage-unknown-planet` implements Lunar's `StorageBundle` with a scoped Unknown Planet `Planet` client. Its SQL capability must use PostgreSQL transactions.
 
 ```ts
-import { createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar/storage-unknown-planet";
+import { createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar-adk/storage-unknown-planet";
 
 await migrateUnknownPlanetStorage({ planet });
 const storage = createUnknownPlanetStorage({ planet, scope: { tenantId: "acme" } });

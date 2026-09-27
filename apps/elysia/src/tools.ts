@@ -1,4 +1,4 @@
-import { defineTool } from "@lunar/adk";
+import { defineTool } from "@lunar-adk/adk";
 
 interface CalculationInput {
   expression: string;

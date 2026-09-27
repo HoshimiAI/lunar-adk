@@ -1,4 +1,4 @@
-import type { AuthPrincipal, AuthProvider } from "@lunar/foundation/auth";
+import type { AuthPrincipal, AuthProvider } from "@lunar-adk/foundation/auth";
 
 export interface BetterAuthSession<User = unknown, Session = unknown> {
   user: User;

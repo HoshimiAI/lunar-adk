@@ -1,15 +1,15 @@
 ---
-title: "API: @lunar/foundation"
+title: "API: @lunar-adk/foundation"
 description: Complete reference for foundation helpers and subpath modules
 ---
 
-`@lunar/adk` is the recommended application facade. Use these subpath exports
+`@lunar-adk/adk` is the recommended application facade. Use these subpath exports
 when building adapters, persistence, plugins, evaluation tooling, or advanced
 runtime integrations.
 
 ## Agent
 
-Package: `@lunar/foundation/agent`
+Package: `@lunar-adk/foundation/agent`
 
 - `defineAgent(config, eventBus?)` creates an `Agent` from a model, prompt,
   tools, retry policy, and context limits.
@@ -28,7 +28,7 @@ Package: `@lunar/foundation/agent`
 
 ## Tool
 
-Package: `@lunar/foundation/tool`
+Package: `@lunar-adk/foundation/tool`
 
 - `defineTool(tool)` preserves a typed tool definition.
 - `executeTool(tool, input)` validates and executes a tool, returning its
@@ -39,7 +39,7 @@ Package: `@lunar/foundation/tool`
 
 ## Model
 
-Package: `@lunar/foundation/model`
+Package: `@lunar-adk/foundation/model`
 
 - `defineModelProvider(provider)` preserves a `ModelProvider` contract.
 - `supports(capabilities, feature)` checks a model capability flag.
@@ -47,7 +47,7 @@ Package: `@lunar/foundation/model`
 
 ## Context
 
-Package: `@lunar/foundation/context`
+Package: `@lunar-adk/foundation/context`
 
 - `buildContext(messages, budget)` selects recent messages until the estimated
   token budget is satisfied.
@@ -58,7 +58,7 @@ Package: `@lunar/foundation/context`
 
 ## Workflow
 
-Package: `@lunar/foundation/workflow`
+Package: `@lunar-adk/foundation/workflow`
 
 - `defineWorkflow(config)` creates a workflow from a custom runner or root step.
 - `sequential(steps)` creates a sequential workflow step.
@@ -71,7 +71,7 @@ Package: `@lunar/foundation/workflow`
 
 ## Runs and traces
 
-Package: `@lunar/foundation/run`
+Package: `@lunar-adk/foundation/run`
 
 - `createRun(metadata?)` creates a pending run.
 - `startRun(run)` marks a run as running.
@@ -93,7 +93,7 @@ they are not currently exported from a public Foundation subpath.
 
 ## Sessions
 
-Package: `@lunar/foundation/session`
+Package: `@lunar-adk/foundation/session`
 
 - `createSession()` creates an empty session with a generated ID.
 - `appendMessage(session, message)` returns a session with a new message.
@@ -103,7 +103,7 @@ Package: `@lunar/foundation/session`
 
 ## Memory and evaluation
 
-Packages: `@lunar/foundation/memory`, `@lunar/foundation/evaluation`
+Packages: `@lunar-adk/foundation/memory`, `@lunar-adk/foundation/evaluation`
 
 - `createMemory(provider)` preserves a `MemoryProvider`.
 - `createInMemoryProvider(id?)` creates a namespace- and metadata-aware development provider.
@@ -115,8 +115,8 @@ Packages: `@lunar/foundation/memory`, `@lunar/foundation/evaluation`
 
 ## Auth, observability, and storage
 
-Packages: `@lunar/foundation/auth`, `@lunar/foundation/observability`, and
-`@lunar/foundation/storage`
+Packages: `@lunar-adk/foundation/auth`, `@lunar-adk/foundation/observability`, and
+`@lunar-adk/foundation/storage`
 
 - `AuthPrincipal` identifies a subject, tenant, and permissions; implement
   `AuthProvider.authenticate(request)` to integrate an application identity
@@ -127,12 +127,12 @@ Packages: `@lunar/foundation/auth`, `@lunar/foundation/observability`, and
   flags declare optimistic concurrency and atomic run/session writes.
 - `StorageConflictError` identifies a stale write with resource, ID, expected,
   and actual revisions.
-- `verifyStorageBundle()` from `@lunar/foundation/storage/testing` validates a
+- `verifyStorageBundle()` from `@lunar-adk/foundation/storage/testing` validates a
   custom storage bundle's contract.
 
 ## Plugins and events
 
-Package: `@lunar/foundation/plugin`
+Package: `@lunar-adk/foundation/plugin`
 
 - `definePlugin(plugin)` defines a versioned runtime extension bundle.
 - A plugin can register related tools, agents, workflows, memory providers,
@@ -146,7 +146,7 @@ Package: `@lunar/foundation/plugin`
 - `PluginRegistry`, `CommandRegistry`, and `SchemaRegistry` manage registered
   plugins and plugin-provided capabilities.
 
-Package: `@lunar/foundation/event`
+Package: `@lunar-adk/foundation/event`
 
 - `EventBus` subscribes to and emits typed runtime events.
 - `EVENT_NAMES` contains the supported event names.
@@ -160,7 +160,7 @@ The current names are `run.started`, `run.completed`, `run.failed`,
 
 ## Result helpers
 
-Package: `@lunar/foundation/types`
+Package: `@lunar-adk/foundation/types`
 
 - `ok(value)` creates a successful `Result`.
 - `err(error)` creates a failed `Result`.

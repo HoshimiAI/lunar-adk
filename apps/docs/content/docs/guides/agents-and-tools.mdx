@@ -9,8 +9,8 @@ An agent combines a model provider, instructions, tools, and execution limits.
 Create one with `defineAgent` and register it with a runtime:
 
 ```ts
-import { createRuntime, defineAgent, defineTool } from '@lunar/adk';
-import { createOpenAIModelProvider } from '@lunar/provider-openai';
+import { createRuntime, defineAgent, defineTool } from '@lunar-adk/adk';
+import { createOpenAIModelProvider } from '@lunar-adk/provider-openai';
 
 const calculator = defineTool({
   name: 'calculate',

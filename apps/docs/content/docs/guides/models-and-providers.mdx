@@ -10,7 +10,7 @@ and optionally `stream()`.
 ## OpenAI
 
 ```ts
-import { createOpenAIModelProvider } from '@lunar/provider-openai';
+import { createOpenAIModelProvider } from '@lunar-adk/provider-openai';
 
 const model = createOpenAIModelProvider({
   model: process.env.OPENAI_MODEL ?? 'gpt-5-mini',
@@ -23,11 +23,11 @@ headers, a custom `fetch`, and capability overrides.
 
 ## AI SDK adapter
 
-Use `@lunar/provider-ai-sdk` when the application already has an AI SDK
+Use `@lunar-adk/provider-ai-sdk` when the application already has an AI SDK
 `LanguageModel`:
 
 ```ts
-import { createAISDKModelProvider } from '@lunar/provider-ai-sdk';
+import { createAISDKModelProvider } from '@lunar-adk/provider-ai-sdk';
 
 const model = createAISDKModelProvider({
   id: 'my-provider:model',

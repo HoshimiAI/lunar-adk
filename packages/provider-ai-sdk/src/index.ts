@@ -5,7 +5,7 @@ import type {
   ModelResponse,
   ModelToolCall,
   ModelStreamPart,
-} from "@lunar/foundation/model";
+} from "@lunar-adk/foundation/model";
 
 export interface AISDKModelProviderOptions {
   id: string;
