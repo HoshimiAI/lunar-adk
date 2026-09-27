@@ -112,3 +112,36 @@ test("Planet memory ingestion works when ADK supplies no precomputed vector", as
   expect(saved.content).toBe("Planet embeds this");
   expect(saved).not.toHaveProperty("embedding");
 });
+
+test("SDK 1.1 persist mode stores without semantic ingestion", async () => {
+  const now = new Date();
+  let persistedInput: Record<string, unknown> | undefined;
+  let addCalls = 0;
+  const planet = {
+    withScope() {
+      return { memory: {
+        async persist(input: Record<string, unknown>) {
+          persistedInput = input;
+          return {
+            id: String(input.id),
+            agentId: String(input.agentId),
+            content: String(input.content),
+            type: "fact",
+            metadata: input.metadata as PlanetMemoryRecord["metadata"],
+            createdAt: now,
+            updatedAt: now,
+          };
+        },
+        async add() { addCalls += 1; throw new Error("add should not run in persist mode"); },
+      } };
+    },
+  } as unknown as Planet;
+  const provider = createUnknownPlanetMemoryProvider({ planet, scope: { tenantId: "tenant-a" }, writeMode: "persist" });
+
+  const stored = await provider.store({ content: "framework-owned memory", tenantId: "tenant-a" });
+
+  expect(persistedInput).toMatchObject({ content: "framework-owned memory", agentId: "lunar-adk:unknown-planet" });
+  expect(addCalls).toBe(0);
+  expect(provider.capabilities?.semanticSearch).toBe(false);
+  expect(stored.content).toBe("framework-owned memory");
+});

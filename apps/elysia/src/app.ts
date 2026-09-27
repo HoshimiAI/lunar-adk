@@ -11,6 +11,7 @@ import { createBunSqlMemoryProvider } from "@lunar/memory-bun-sql";
 import { createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar/storage-unknown-planet";
 import { createBetterAuthProvider, type BetterAuthLike, type BetterAuthSession } from "@lunar/auth-better-auth";
 import { createConsoleExporter, createOTLPExporter } from "@lunar/observability-otel";
+import { createTelemetryMonitor, MONITOR_HTML, type TelemetryMonitor } from "./monitor";
 import { elysiaTools } from "./tools";
 
 function encodeSse(event: string, data: unknown): Uint8Array {
@@ -133,7 +134,9 @@ export interface AppOptions {
   /** Add tools to the default assistant. */
   agentTools?: NonNullable<AgentConfig["tools"]>;
   /** Provide a Planet client configured with the capabilities used by the app. */
-  unknownPlanet?: { planet: Planet; scope: PlanetScope };
+  unknownPlanet?: { planet: Planet; scope: PlanetScope; memoryWriteMode?: "ingest" | "persist" };
+  /** In-memory ADK trace view used by the monitor page. */
+  telemetryMonitor?: TelemetryMonitor;
 }
 
 export interface DefaultAppOptions extends AppOptions {
@@ -642,6 +645,11 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         }),
       },
     );
+  if (options.telemetryMonitor) {
+    configuredApp
+      .get("/monitor", () => new Response(MONITOR_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } }))
+      .get("/monitor/api/runs", ({ principal }) => ({ generatedAt: Date.now(), runs: options.telemetryMonitor!.list(principal) }));
+  }
   if (options.recoverWorkflowsOnStartup) await runtime.recoverWorkflows();
   return configuredApp;
 }
@@ -750,7 +758,11 @@ export async function createDefaultApp(options: DefaultAppOptions = {}) {
     throw new Error("Pass a configured unknownPlanet Planet client and scope when MEMORY_PROVIDER=unknown-planet");
   }
   const memoryProvider: MemoryProvider | undefined = memoryProviderName === "unknown-planet"
-    ? createUnknownPlanetMemoryProvider(options.unknownPlanet!)
+    ? createUnknownPlanetMemoryProvider({
+        planet: options.unknownPlanet!.planet,
+        scope: options.unknownPlanet!.scope,
+        writeMode: options.unknownPlanet!.memoryWriteMode,
+      })
     : memoryProviderName === "postgres"
       ? await createBunSqlMemoryProvider({ connection: process.env.MEMORY_DATABASE_URL ?? process.env.DATABASE_URL ?? (() => { throw new Error("MEMORY_DATABASE_URL or DATABASE_URL is required when MEMORY_PROVIDER=postgres"); })() })
       : undefined;
@@ -759,7 +771,8 @@ export async function createDefaultApp(options: DefaultAppOptions = {}) {
     model: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
     ...(process.env.OPENAI_EMBEDDING_DIMENSIONS ? { dimensions: Number(process.env.OPENAI_EMBEDDING_DIMENSIONS) } : {}),
   });
-  const exporters = [];
+  const telemetryMonitor = createTelemetryMonitor();
+  const exporters = [telemetryMonitor.exporter];
   if (process.env.LUNAR_TELEMETRY === "console") exporters.push(createConsoleExporter());
   const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   if (otlpEndpoint) exporters.push(createOTLPExporter({
@@ -792,6 +805,7 @@ export async function createDefaultApp(options: DefaultAppOptions = {}) {
 
   const app = await createApp(runtime, {
     ...options,
+    telemetryMonitor,
     rateLimit,
     embedding: options.embedding ?? embedding,
     ready: async () => {

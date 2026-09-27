@@ -47,7 +47,7 @@
         "@lunar/storage-http": "workspace:*",
         "@lunar/storage-sqlite": "workspace:*",
         "@lunar/storage-unknown-planet": "workspace:*",
-        "@unknown-planet/sdk": "^1.0.0",
+        "@unknown-planet/sdk": "^1.1.0",
         "better-auth": "^1.6.0",
         "elysia": "latest",
       },
@@ -156,7 +156,7 @@
       "version": "1.0.0",
       "peerDependencies": {
         "@lunar/foundation": "^1.0.0",
-        "@unknown-planet/sdk": "^1.0.0",
+        "@unknown-planet/sdk": "^1.1.0",
       },
     },
   },
@@ -617,9 +617,9 @@
 
     "@ungap/structured-clone": ["@ungap/structured-clone@1.4.0", "", {}, "sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ=="],
 
-    "@unknown-planet/core": ["@unknown-planet/core@1.0.0", "", {}, "sha512-1iUiARgEoYuOtikDHh+h057y34U5nv6wHkD47KePFAby4VuKiqOkSI8ou5Us5ItZeLm40bpHqwvn+YJbmEtnfA=="],
+    "@unknown-planet/core": ["@unknown-planet/core@1.1.0", "", {}, "sha512-FOPpOt3ApKby+PItuBJYSgi0EX4CBMSvrTjJy9n9dJqTQ4/d9QgCfJ9ypJ4/VAsLDV1yxfOc44V/7VywbXn2HQ=="],
 
-    "@unknown-planet/sdk": ["@unknown-planet/sdk@1.0.0", "", { "dependencies": { "@opentelemetry/api": "^1.9.1", "@unknown-planet/core": "^1.0.0" } }, "sha512-CEsKKzgM9yKkHdN+gdU4qqfV2L0U5B7U5xmYH7WFACYwngWwFJwguLi6Wkpbwr8w1/MQ1/EibV+Ure9PPzMmXA=="],
+    "@unknown-planet/sdk": ["@unknown-planet/sdk@1.1.0", "", { "dependencies": { "@opentelemetry/api": "^1.9.1", "@unknown-planet/core": "^1.1.0" } }, "sha512-8fDa511vdLTHKkP2WY6+Rw1vV7eLvxQ88yCD4+ABhf7xMVRDUYbKb0lyNos7JtpGWH+g134InFnhQQC3Usm31g=="],
 
     "@unrs/resolver-binding-android-arm-eabi": ["@unrs/resolver-binding-android-arm-eabi@1.12.2", "", { "os": "android", "cpu": "arm" }, "sha512-g5T90pqg1bo/7mytQx6F4iBNC0Wsh9cu+z9veDbFjc7HjpesJFWD7QMS0NGStXM075+7dJPPVvBbpZlnrdpi/w=="],
 

@@ -24,7 +24,15 @@ UP_TEST_DATABASE_URL=postgres://lunar_test:lunar_test@localhost:55432/lunar_test
 
 The Compose service binds only to localhost and stores data in the `unknown-planet-test-data` volume. Stop it with `docker compose down`; remove the test data too with `docker compose down -v`.
 
-The memory provider maps Lunar records to Unknown Planet's scoped memory store and vectors. It preserves Lunar owner, namespace, metadata, and expiry fields, filters expired records during retrieval and listing, and uses cursor-based Planet memory search for listing. Supply an `embedding` when storing records to enable vector retrieval. Configure Planet's memory, vector, and graph capabilities for the operations you use; Planet memory deletion cleans up related graph and vector data. The caller still owns the Planet client and should close its providers after the runtime has stopped.
+The memory provider maps Lunar records to Unknown Planet's scoped memory store. It preserves Lunar owner, namespace, metadata, and expiry fields, filters expired records during retrieval and listing, and uses cursor-based Planet memory search for listing. By default, it uses SDK 1.1's `planet.memory.add()` for semantic ingestion; configure Planet's memory, vector, graph, and embedding capabilities. Set `writeMode: "persist"` to use `planet.memory.persist()` when another system owns embeddings and graph ingestion. Persist mode needs only Planet's memory store and provides lexical search. Both modes use Planet memory deletion, which cleans up related graph and vector data when present. The caller still owns the Planet client and should close its providers after the runtime has stopped.
+
+```ts
+const memory = createUnknownPlanetMemoryProvider({
+  planet,
+  scope: { tenantId: "acme" },
+  writeMode: "persist",
+});
+```
 
 The Elysia app can opt into its SQL storage with `STORAGE_PROVIDER=unknown-planet` and `DATABASE_URL`. It runs this package's migration at startup and scopes records to `PLANET_TENANT_ID` (default `lunar-local`).
 

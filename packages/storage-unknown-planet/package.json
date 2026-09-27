@@ -9,6 +9,6 @@
   },
   "peerDependencies": {
     "@lunar/foundation": "^1.0.0",
-    "@unknown-planet/sdk": "^1.0.0"
+    "@unknown-planet/sdk": "^1.1.0"
   }
 }

@@ -87,6 +87,8 @@ curl -N -X POST http://localhost:3000/run/stream \
 
 The stream emits named lifecycle events such as `run.started`, `tool.completed`, and `run.completed`, plus `text.delta`, `stream.completed`, and `stream.error`. The final event includes the run and session identifiers. Models without streaming support return `501` with error code `STREAMING_UNSUPPORTED`.
 
+Open [`/monitor`](http://localhost:3000/monitor) for a live view of the latest 100 ADK runs, token totals, durations, statuses, and trace spans. The page is protected by the app's configured authentication and shows only the authenticated user's runs. It reads from a bounded in-memory OTEL exporter; configure `OTEL_EXPORTER_OTLP_ENDPOINT` separately to forward traces to an OTEL collector.
+
 Register flexible code-first workflows with managed subagents:
 
 ```ts

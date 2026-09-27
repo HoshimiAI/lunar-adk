@@ -1,5 +1,5 @@
 import type { MemoryListQuery, MemoryPage, MemoryProvider, MemoryQuery, MemoryRecord } from "@lunar/foundation/memory";
-import type { JsonObject, MemoryRecord as PlanetMemoryRecord, Planet, PlanetScope } from "@unknown-planet/sdk";
+import type { AddMemoryInput, JsonObject, MemoryRecord as PlanetMemoryRecord, Planet, PlanetScope } from "@unknown-planet/sdk";
 
 const DEFAULT_PROVIDER_ID = "unknown-planet";
 // Planet's cursor-based memory search clamps page sizes to 500.
@@ -15,6 +15,8 @@ export interface UnknownPlanetMemoryOptions {
   planet: Planet;
   scope: PlanetScope;
   id?: string;
+  /** Use SDK `memory.persist` when another system owns embeddings and graph ingestion. */
+  writeMode?: "ingest" | "persist";
 }
 
 function metadata(value: PlanetMemoryRecord): LunarMetadata {
@@ -55,6 +57,7 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
   const planet = options.planet.withScope(options.scope);
   const scopedTenantId = options.scope.tenantId;
   const providerId = options.id ?? DEFAULT_PROVIDER_ID;
+  const writeMode = options.writeMode ?? "ingest";
   const agentId = `lunar-adk:${providerId}`;
 
   async function textPage(input: { text?: string; ownerId?: string; limit: number; cursor?: string; namespace?: string; filter?: Record<string, unknown> }): Promise<{ records: MemoryRecord[]; nextCursor?: string }> {
@@ -82,21 +85,29 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
 
   return {
     id: providerId,
-    capabilities: { semanticSearch: true, embeddingOwner: "provider", metadataFiltering: true, namespaces: true, deletion: true },
+    capabilities: {
+      ...(writeMode === "ingest" ? { semanticSearch: true, embeddingOwner: "provider" as const } : { semanticSearch: false }),
+      metadataFiltering: true,
+      namespaces: true,
+      deletion: true,
+    },
     async store(input) {
       if (input.tenantId !== undefined && input.tenantId !== scopedTenantId) throw new Error("Memory tenantId does not match the configured Unknown Planet scope.");
       if (input.expiresAt !== undefined && (!Number.isFinite(input.expiresAt) || input.expiresAt <= Date.now())) throw new Error("Memory expiresAt must be in the future.");
       const id = crypto.randomUUID();
-      const stored = await planet.memory.add({
+      const planetInput: AddMemoryInput = {
         id,
         agentId,
         content: input.content,
         type: "fact",
         ...(input.ownerId === undefined ? {} : { userId: input.ownerId }),
         metadata: { lunarAdk: { namespace: input.namespace, expiresAt: input.expiresAt, metadata: input.metadata } } as JsonObject,
-      });
-      // Planet owns embedding and graph ingestion for content sent to its memory API.
-      // ADK's optional precomputed embedding is intentionally not forwarded.
+      };
+      const stored = writeMode === "persist"
+        ? await planet.memory.persist(planetInput)
+        : await planet.memory.add(planetInput);
+      // Planet owns embedding and graph ingestion in add mode. ADK's optional
+      // precomputed embedding is intentionally not forwarded in either mode.
       return {
         id: stored.id,
         content: stored.content,

@@ -45,6 +45,12 @@ and raw search text to `planet.memory.search()`. Planet's `PlanetConfig.embeddin
 provider creates vectors using its configured model and dimensions. Lunar ADK's
 embedding provider remains independent and does not configure Planet.
 
+With Unknown Planet SDK 1.1 or newer, set `unknownPlanet.memoryWriteMode` to
+`"persist"` in `createApp` options when another system owns embeddings and graph
+ingestion. This uses `planet.memory.persist()` and requires only Planet's memory
+store; retrieval is lexical in this mode. The default `"ingest"` mode keeps
+Planet-owned semantic ingestion.
+
 For example, the OpenAI-compatible provider is configured when constructing
 Planet alongside the PostgreSQL provider:
 
