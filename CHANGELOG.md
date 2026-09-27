@@ -2,38 +2,6 @@
 
 ## Unreleased
 
-- Added Unknown Planet adapters for revision-safe Lunar storage and scoped memory search.
-- Added tenant-aware runtime records, authenticated Elysia composition, and a Better Auth adapter contract.
-- Added PostgreSQL full-text curated memory with expiry and permission-protected management routes.
-- Added atomic PostgreSQL run/session persistence through the Bun.SQL storage bundle.
-
-- Added opt-in agent memory retrieval and conversation storage.
-- Added namespaces, metadata filters, deletion, lifecycle ownership, and duplicate-ID protection for memory providers.
-- Made adapter revision checks atomic and added a reusable storage conformance verifier.
-- Added explicit storage capabilities for atomic run/session persistence.
-
-- Fixed plugin workflow registration by sharing the runtime workflow registry.
-- Added revision-aware storage saves and stale-write conflict detection.
-- Normalized sessions to store run references instead of full run records.
-- Added runtime-owned storage bundle shutdown and atomic SQLite run/session saves.
-
-- Added a generic HTTP storage provider for runs, sessions, and workflows.
-- Added Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
-- Added an SDK-neutral MongoDB storage adapter.
-- Added local/remote storage selection to the Elysia example.
-- Documented the storage contract for future Unknown Planet compatibility.
-
-- Added optional observability exporters for console output and OTLP traces.
-- Added agent, model, and tool trace spans with token and status metadata.
-- Added default telemetry redaction and Elysia environment configuration.
-
-## 1.2.0
-
-- Added flexible code-first workflow definitions with explicit checkpoints and approval pauses.
-- Added durable workflow run storage and workflow lifecycle HTTP endpoints.
-- Added managed subagent execution with parent-child run linkage and shared cancellation.
-- Added mid-conversation steering with linked continuation runs and stream interruption handoff events.
-
 ## 1.1.0
 
 - Added opt-in model streaming through the provider and runtime contracts.
@@ -41,6 +9,31 @@
 - Added streaming capability detection with a stable `501` response.
 - Added deterministic runtime and Elysia streaming tests.
 - Added a Bruno streaming request example.
+- Added Unknown Planet adapters for revision-safe Lunar storage and scoped memory search.
+- Added tenant-aware runtime records, authenticated Elysia composition, and a Better Auth adapter contract.
+- Added PostgreSQL full-text curated memory with expiry and permission-protected management routes.
+- Added atomic PostgreSQL run/session persistence through the Bun.SQL storage bundle.
+- Added opt-in agent memory retrieval and conversation storage.
+- Added namespaces, metadata filters, deletion, lifecycle ownership, and duplicate-ID protection for memory providers.
+- Made adapter revision checks atomic and added a reusable storage conformance verifier.
+- Added explicit storage capabilities for atomic run/session persistence.
+- Fixed plugin workflow registration by sharing the runtime workflow registry.
+- Added revision-aware storage saves and stale-write conflict detection.
+- Normalized sessions to store run references instead of full run records.
+- Added runtime-owned storage bundle shutdown and atomic SQLite run/session saves.
+- Added a generic HTTP storage provider for runs, sessions, and workflows.
+- Added Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
+- Added an SDK-neutral MongoDB storage adapter.
+- Added local/remote storage selection to the Elysia example.
+- Documented the storage contract for future Unknown Planet compatibility.
+- Added optional observability exporters for console output and OTLP traces.
+- Added agent, model, and tool trace spans with token and status metadata.
+- Added default telemetry redaction and Elysia environment configuration.
+- Added flexible code-first workflow definitions with explicit checkpoints and approval pauses.
+- Added durable workflow run storage and workflow lifecycle HTTP endpoints.
+- Added managed subagent execution with parent-child run linkage and shared cancellation.
+- Added mid-conversation steering with linked continuation runs and stream interruption handoff events.
+- Added MCP session actions and queued session messages.
 
 ## 1.0.0
 

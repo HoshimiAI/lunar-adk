@@ -1,6 +1,6 @@
 {
   "name": "@lunar/memory-sqlite",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "test": "bun test", "typecheck": "tsc --noEmit" },
