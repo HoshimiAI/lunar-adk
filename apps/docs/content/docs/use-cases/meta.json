@@ -1,4 +1,4 @@
 {
   "title": "Use cases",
-  "pages": ["assistant-api", "approval-workflow", "durable-agent", "unknown-planet"]
+  "pages": ["assistant-api", "approval-workflow", "durable-agent", "multi-user-auth", "unknown-planet"]
 }

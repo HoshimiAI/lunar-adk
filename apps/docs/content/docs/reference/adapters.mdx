@@ -99,6 +99,21 @@ before serving requests. The caller owns the Planet client and connection.
 This adapter requires SQL transactions; it does not automatically configure
 the Elysia app's separate `MemoryProvider`.
 
+## `createUnknownPlanetAdapters(options)`
+
+Package: `@lunar-adk/storage-unknown-planet`
+
+Composes selected `storage`, `memory`, and `context` adapters from one
+caller-owned Planet client and required tenant/workspace scope. Set
+`storage: true`, `memory: { ... }`, and/or `context: true`; at least one must be
+selected. Pass the result to `createRuntime()`. The configured tenant is fixed.
+A tenant-only scope can select the authenticated workspace per operation; when
+`scope.workspaceId` is set, adapters reject requests for a different workspace.
+Storage migration remains explicit through `migrateUnknownPlanetStorage()`, and
+the application owns the Planet client and provider lifecycle. Context retrieval
+is workspace scoped and shared within that workspace; it does not apply user
+document ACLs.
+
 ## `createMongoStores(options)`
 
 Package: `@lunar-adk/storage-mongo`

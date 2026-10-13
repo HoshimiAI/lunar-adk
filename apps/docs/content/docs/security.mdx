@@ -13,9 +13,13 @@ storage, and telemetry providers before enabling it in production.
 ## Authentication and tenants
 
 For a multi-tenant service, pass an `AuthProvider` to `createApp()`. It must
-verify the incoming request and return a principal with a tenant ID and
-permissions. Lunar scopes runs, sessions, workflow runs, and memories to that
-tenant. Do not derive a tenant from an unverified request header.
+verify the incoming request and return a principal with a subject ID, tenant
+ID, optional workspace ID, and permissions. Lunar scopes saved runs, sessions,
+workflow runs, and user memories to that identity. Workspace scope is carried
+through the Elysia routes into storage adapters. Do not derive identity or
+workspace from an unverified request header. Knowledge context is shared at
+the configured tenant/workspace boundary; use a provider that applies document
+ACLs when source records have user-level access rules.
 
 `createDefaultApp()` requires an `AuthProvider` unless the caller explicitly
 sets `allowUnauthenticated: true`. The packaged server accepts that opt-in
@@ -32,6 +36,92 @@ tenant and permission model. Curated memory endpoints require `memory:read`,
 For Elysia, use `createAppWithBetterAuth(runtime, { betterAuth, mapPrincipal })`.
 It mounts Better Auth's `/api/auth` handler and protects Lunar routes with the
 same verified session.
+
+By default, persisted sessions, runs, and workflow runs are private to the
+principal that created them. If the host application supports shared resources,
+provide `authorizeResource` to apply its ACLs for each operation. Lunar still
+requires the resource tenant and workspace to match the authenticated principal;
+the callback decides whether that principal may perform the requested action
+inside that scope.
+
+```ts
+createApp(runtime, {
+  auth,
+  authorizeResource: ({ principal, resource, action, value }) =>
+    kanoAccess.canPerform({
+      userId: principal.subjectId,
+      organizationId: value.tenantId,
+      projectId: value.workspaceId,
+      resource,
+      action,
+    }),
+});
+```
+
+Keep project/task authorization in the host application. The callback can use
+its membership and sharing tables; Lunar does not need to know Kano's domain
+model.
+
+## Credentials for tools
+
+Authentication credentials for incoming requests and credentials an agent uses
+to call another service are separate. Configure a host-owned `toolCredentials`
+provider on `createRuntime()`. It receives the verified principal, tool name,
+and a credential reference chosen by trusted tool code. The host must check
+that the user can use that credential and requested scopes, then return a
+short-lived access token. Lunar passes the principal only for the current
+execution; it does not persist it with run, session, or workflow state. On
+approval or workflow resume, authenticate the new request again.
+For the packaged Elysia server, pass the same adapter as `toolCredentials` to
+`createDefaultApp()`; for a custom Elysia app, configure it when creating the
+runtime.
+
+```ts
+import { createRuntime, defineTool } from '@lunar-adk/adk';
+
+const runtime = await createRuntime({
+  toolCredentials: {
+    async resolve({ principal, toolName, credentialId, scopes }) {
+      // The app resolves a vault reference after checking membership and scopes.
+      return credentialVault.accessToken({
+        userId: principal.subjectId,
+        tenantId: principal.tenantId,
+        toolName,
+        credentialId,
+        scopes,
+      });
+    },
+  },
+});
+
+const calendarTool = defineTool({
+  name: 'calendar_list',
+  description: 'List events from the connected calendar',
+  schema: calendarInputSchema,
+  async execute(input, context) {
+    const credential = await context?.getCredential?.({
+      credentialId: 'primary-calendar',
+      scopes: ['calendar.events.read'],
+    });
+    if (!credential) throw new Error('Calendar is not connected');
+    return calendarClient.list(input, {
+      accessToken: credential.accessToken,
+      tokenType: credential.tokenType,
+    });
+  },
+});
+```
+
+Keep refresh tokens and provider secrets inside the host vault. Do not put them
+in tool inputs, model messages, run outputs, events, or session state. A tool
+should use a server-configured credential reference; the model must not choose
+which user's credential to load. Direct `Agent.run()` calls do not receive a
+runtime credential provider; configure the provider on `createRuntime()`.
+
+For harnesses or Kano, the integration flow is: verify the host session, map
+the verified user and tenant to `AuthPrincipal`, call Lunar with that
+principal, let `authorizeResource` check the host's object ACL, and let the
+credential provider authorize tool access against the same host identity.
 
 ## Request quotas
 

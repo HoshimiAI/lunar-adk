@@ -24,7 +24,7 @@ function metadata(value: PlanetMemoryRecord): LunarMetadata {
   return stored && typeof stored === "object" && !Array.isArray(stored) ? stored as LunarMetadata : {};
 }
 
-function record(value: PlanetMemoryRecord, tenantId: string, score?: number): MemoryRecord {
+function record(value: PlanetMemoryRecord, tenantId: string, workspaceId?: string, score?: number): MemoryRecord {
   const saved = metadata(value);
   return {
     id: value.id,
@@ -32,6 +32,7 @@ function record(value: PlanetMemoryRecord, tenantId: string, score?: number): Me
     ...(saved.metadata ? { metadata: saved.metadata } : {}),
     ...(saved.namespace === undefined ? {} : { namespace: saved.namespace }),
     tenantId,
+    ...(workspaceId === undefined ? {} : { workspaceId }),
     ...(value.userId === undefined ? {} : { ownerId: value.userId }),
     ...(saved.expiresAt === undefined ? {} : { expiresAt: saved.expiresAt }),
     ...(score === undefined ? {} : { score }),
@@ -41,6 +42,7 @@ function record(value: PlanetMemoryRecord, tenantId: string, score?: number): Me
 
 function matches(value: MemoryRecord, query: MemoryQuery | MemoryListQuery): boolean {
   if (query.tenantId !== undefined && query.tenantId !== value.tenantId) return false;
+  if (query.workspaceId !== undefined && query.workspaceId !== value.workspaceId) return false;
   if (query.ownerId !== undefined && query.ownerId !== value.ownerId) return false;
   if (query.namespace !== undefined && query.namespace !== value.namespace) return false;
   if (query.filter && !Object.entries(query.filter).every(([key, expected]) => JSON.stringify(value.metadata?.[key]) === JSON.stringify(expected))) return false;
@@ -54,17 +56,27 @@ function validateScope(scope: PlanetScope): void {
 /** Adapts Planet's scoped memory and vector capabilities to Lunar's MemoryProvider contract. */
 export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOptions): MemoryProvider {
   validateScope(options.scope);
-  const planet = options.planet.withScope(options.scope);
   const scopedTenantId = options.scope.tenantId;
   const providerId = options.id ?? DEFAULT_PROVIDER_ID;
   const writeMode = options.writeMode ?? "ingest";
   const agentId = `lunar-adk:${providerId}`;
 
-  async function textPage(input: { text?: string; ownerId?: string; limit: number; cursor?: string; namespace?: string; filter?: Record<string, unknown> }): Promise<{ records: MemoryRecord[]; nextCursor?: string }> {
+  function forWorkspace(workspaceId?: string) {
+    const requestWorkspaceId = workspaceId ?? options.scope.workspaceId;
+    if (options.scope.workspaceId !== undefined && requestWorkspaceId !== options.scope.workspaceId) {
+      throw new Error("Memory provider workspace does not match the requested workspace.");
+    }
+    return options.planet.withScope({
+      tenantId: scopedTenantId,
+      ...(requestWorkspaceId ? { workspaceId: requestWorkspaceId } : {}),
+    });
+  }
+
+  async function textPage(input: { text?: string; ownerId?: string; workspaceId?: string; limit: number; cursor?: string; namespace?: string; filter?: Record<string, unknown> }): Promise<{ records: MemoryRecord[]; nextCursor?: string }> {
     const records: MemoryRecord[] = [];
     let cursor = input.cursor;
     while (records.length < input.limit) {
-      const page = await planet.memory.searchPage({
+      const page = await forWorkspace(input.workspaceId).memory.searchPage({
         agentId,
         ...(input.ownerId === undefined ? {} : { userId: input.ownerId }),
         ...(input.text?.trim() ? { query: input.text } : {}),
@@ -72,8 +84,8 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
         ...(cursor ? { cursor } : {}),
       });
       for (const item of page.items) {
-        const mapped = record(item, scopedTenantId);
-        if (matches(mapped, { tenantId: scopedTenantId, ownerId: input.ownerId, namespace: input.namespace, filter: input.filter })) records.push(mapped);
+        const mapped = record(item, scopedTenantId, input.workspaceId ?? options.scope.workspaceId);
+        if (matches(mapped, { tenantId: scopedTenantId, workspaceId: input.workspaceId ?? options.scope.workspaceId, ownerId: input.ownerId, namespace: input.namespace, filter: input.filter })) records.push(mapped);
         if (records.length >= input.limit) break;
       }
       if (!page.nextCursor) return { records };
@@ -103,6 +115,8 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
         ...(input.ownerId === undefined ? {} : { userId: input.ownerId }),
         metadata: { lunarAdk: { namespace: input.namespace, expiresAt: input.expiresAt, metadata: input.metadata } } as JsonObject,
       };
+      const workspaceId = input.workspaceId ?? options.scope.workspaceId;
+      const planet = forWorkspace(workspaceId);
       const stored = writeMode === "persist"
         ? await planet.memory.persist(planetInput)
         : await planet.memory.add(planetInput);
@@ -114,6 +128,7 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
         ...(input.metadata ? { metadata: input.metadata } : {}),
         ...(input.namespace === undefined ? {} : { namespace: input.namespace }),
         tenantId: scopedTenantId,
+        ...(workspaceId === undefined ? {} : { workspaceId }),
         ...(input.ownerId === undefined ? {} : { ownerId: input.ownerId }),
         ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
         createdAt: stored.createdAt.getTime(),
@@ -123,26 +138,29 @@ export function createUnknownPlanetMemoryProvider(options: UnknownPlanetMemoryOp
       const limit = Math.max(0, Math.min(100, Math.floor(query.limit ?? 10)));
       if (limit === 0) return [];
       if (query.minScore !== undefined && query.minScore > 1) return [];
+      if (query.tenantId !== undefined && query.tenantId !== scopedTenantId) return [];
+      const planet = forWorkspace(query.workspaceId);
       const found = await planet.memory.search({
         agentId,
         ...(query.ownerId === undefined ? {} : { userId: query.ownerId }),
         ...(query.text.trim() ? { query: query.text } : {}),
         limit: PAGE_LIMIT,
       });
-      const result = found.map((item) => record(item, scopedTenantId));
+      const result = found.map((item) => record(item, scopedTenantId, query.workspaceId ?? options.scope.workspaceId));
       const filtered = result.filter((item) => matchesMemory(item, query));
       return filtered.slice(0, limit);
     },
     async list(query: MemoryListQuery): Promise<MemoryPage> {
       const limit = Math.max(1, Math.min(100, Math.floor(query.limit ?? 50)));
-      const result = await textPage({ ownerId: query.ownerId, limit, cursor: query.cursor, namespace: query.namespace, filter: query.filter });
+      if (query.tenantId !== undefined && query.tenantId !== scopedTenantId) return { records: [] };
+      const result = await textPage({ ownerId: query.ownerId, workspaceId: query.workspaceId, limit, cursor: query.cursor, namespace: query.namespace, filter: query.filter });
       return { records: result.records, ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}) };
     },
-    async delete(id, tenantId, ownerId) {
+    async delete(id, tenantId, ownerId, workspaceId) {
       if (tenantId !== undefined && tenantId !== scopedTenantId) return false;
-      const current = await planet.memory.get(id);
+      const current = await forWorkspace(workspaceId).memory.get(id);
       if (!current || (ownerId !== undefined && current.userId !== ownerId)) return false;
-      return planet.memory.delete(id);
+      return forWorkspace(workspaceId).memory.delete(id);
     },
   };
 }

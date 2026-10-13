@@ -1,5 +1,6 @@
 import type { Agent, AgentRunResult } from "../agent";
 import type { WorkflowStore } from "./store";
+import type { AuthPrincipal } from "../auth";
 
 export type WorkflowStatus = "pending" | "running" | "waiting_approval" | "completed" | "failed" | "cancelled";
 
@@ -19,6 +20,7 @@ export interface WorkflowRun {
   id: string;
   revision?: number;
   tenantId?: string;
+  workspaceId?: string;
   ownerId?: string;
   workflow: string;
   version: string;
@@ -37,7 +39,10 @@ export interface WorkflowRun {
 
 export interface WorkflowRunOptions {
   tenantId?: string;
+  workspaceId?: string;
   ownerId?: string;
+  /** Current request identity; deliberately not persisted with workflow state. */
+  principal?: AuthPrincipal;
 }
 
 export interface WorkflowContext {
@@ -45,6 +50,8 @@ export interface WorkflowContext {
   readonly state: Record<string, unknown>;
   readonly signal: AbortSignal;
   readonly run: WorkflowRun;
+  /** Identity of the current authenticated invocation; absent during background recovery. */
+  readonly principal?: AuthPrincipal;
   readonly resumeFrom?: WorkflowCheckpoint;
   checkpoint(name: string, state?: Record<string, unknown>): Promise<WorkflowCheckpoint>;
   requestApproval(id: string, message: string): Promise<void>;

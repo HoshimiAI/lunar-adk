@@ -4,6 +4,13 @@ import type { WorkflowStore } from "../workflow";
 import type { Run } from "../run";
 import type { Session } from "../session";
 
+/** Authenticated organization/workspace scope supplied for a persisted-record lookup. */
+export interface StorageScope {
+  tenantId?: string;
+  workspaceId?: string;
+  ownerId?: string;
+}
+
 export interface SaveOptions {
   /** Omit only when creating a new record. Updates must supply the last observed revision. */
   expectedRevision?: number;

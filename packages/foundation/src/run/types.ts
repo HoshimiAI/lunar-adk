@@ -2,6 +2,7 @@ import type { LunarEvent } from "../event";
 import type { TraceSpan } from "./trace";
 import type { Artifact } from "./artifact";
 import type { ModelMessage, ModelToolCall } from "../model";
+import type { RetrievedContextAttribution } from "../context";
 
 export type RunStatus = "pending" | "running" | "waiting_approval" | "completed" | "failed" | "cancelled";
 
@@ -17,6 +18,7 @@ export interface Run<Result = unknown> {
   model?: string;
   sessionId?: string;
   tenantId?: string;
+  workspaceId?: string;
   ownerId?: string;
   parentRunId?: string;
   status: RunStatus;
@@ -47,4 +49,6 @@ export interface RunContinuation {
   round: number;
   toolCalls: ModelToolCall[];
   nextToolIndex: number;
+  /** Optional for compatibility with continuations saved before source-aware context was added. */
+  retrievedContext?: RetrievedContextAttribution;
 }

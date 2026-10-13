@@ -19,6 +19,27 @@ const runtime = await createRuntime({ storage, ownsStorage: true });
 Use normal agent runs for conversational turns. Use workflows for jobs that
 contain multiple stages:
 
+Persisted conversations can be resumed by passing their returned `sessionId`
+to another `runtime.run()` call. Name a session for application UI, or fork it
+to explore a different direction while keeping the original history intact:
+
+```ts
+const first = await runtime.run('researcher', 'Research battery storage');
+const sessionId = first.run.sessionId!;
+const named = await runtime.renameSession(sessionId, 'Research: battery storage');
+const branch = await runtime.forkSession(sessionId);
+if (branch) {
+  const alternative = await runtime.run('researcher', 'Explore a grid-scale alternative', {
+    sessionId: branch.id,
+  });
+}
+```
+
+The fork copies conversation history and ownership, starts with no run references,
+and records `parentSessionId`. These operations organize saved conversation
+history; they do not resume a model call or replay a tool that was in flight
+when a process stopped.
+
 ```ts
 runtime.registerWorkflow(defineWorkflow({
   name: 'research',

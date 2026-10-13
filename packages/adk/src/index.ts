@@ -3,6 +3,7 @@ export type { RuntimeConfig, RuntimeHandle, RuntimeStreamEvent, SteeringResult }
 export { definePlugin } from "@lunar-adk/foundation/plugin";
 export type { Plugin, PluginContext, PluginInfo, PluginManifest, PluginPermissions, PluginStatus } from "@lunar-adk/foundation/plugin";
 export type { AuthPrincipal, AuthProvider } from "@lunar-adk/foundation/auth";
+export type { ToolCredential, ToolCredentialProvider } from "@lunar-adk/foundation/tool";
 export { PolicyDeniedError } from "@lunar-adk/foundation/policy";
 export type { PolicyAction, PolicyRule } from "@lunar-adk/foundation/policy";
 
@@ -10,6 +11,7 @@ export { AgentRunError, defineAgent } from "@lunar-adk/foundation/agent";
 export type {
   Agent,
   AgentConfig,
+  AgentContextConfig,
   AgentHooks,
   AgentMemoryConfig,
   AgentRunOptions,
@@ -17,6 +19,8 @@ export type {
   AgentState,
   AgentErrorCode,
 } from "@lunar-adk/foundation/agent";
+export { ContextScopeMismatchError } from "@lunar-adk/foundation/context";
+export type { ContextProvider, ContextQuery, ContextSource, ContextSourceReference, RetrievedContextAttribution, SourceContextRecord } from "@lunar-adk/foundation/context";
 
 export { defineTool } from "@lunar-adk/foundation/tool";
 export type { Tool, ToolResult, ToolPermission, ToolExecutionContext } from "@lunar-adk/foundation/tool";

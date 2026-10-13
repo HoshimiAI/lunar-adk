@@ -1,10 +1,11 @@
 import type { Run } from "./types";
 import type { SaveOptions } from "../storage/types";
 import { StorageConflictError } from "../storage/error";
+import type { StorageScope } from "../storage/types";
 
 export interface RunStore {
   save(run: Run, options?: SaveOptions): Promise<Run>;
-  get(id: string): Promise<Run | undefined>;
+  get(id: string, scope?: StorageScope): Promise<Run | undefined>;
 }
 
 export class InMemoryRunStore implements RunStore {

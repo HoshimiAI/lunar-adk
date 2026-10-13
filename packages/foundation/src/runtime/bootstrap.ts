@@ -1,6 +1,7 @@
 import { AgentRegistry } from "../agent";
 import { ToolRegistry } from "../tool";
 import { MemoryRegistry, createInMemoryProvider } from "../memory";
+import { ContextRegistry } from "../context";
 import { EvaluatorRegistry } from "../evaluation";
 import { EventBus } from "../event";
 import { CommandRegistry, SchemaRegistry, installPlugin, resolveOrder, stopPlugin, type Plugin, type PluginContext } from "../plugin";
@@ -12,6 +13,7 @@ export interface Bootstrapped {
   agents: AgentRegistry;
   tools: ToolRegistry;
   memory: MemoryRegistry;
+  contexts: ContextRegistry;
   evaluators: EvaluatorRegistry;
   events: EventBus;
   workflows: Map<string, Workflow>;
@@ -23,6 +25,7 @@ export interface Bootstrapped {
 export async function bootstrap(
   config: Required<Pick<RuntimeConfig, "plugins" | "policyRules">>,
   memoryProvider?: RuntimeConfig["memory"],
+  contextProvider?: RuntimeConfig["context"],
 ): Promise<Bootstrapped> {
   const agents = new AgentRegistry();
   const tools = new ToolRegistry();
@@ -31,6 +34,11 @@ export async function bootstrap(
     ? [createInMemoryProvider()]
     : Array.isArray(memoryProvider) ? memoryProvider : [memoryProvider];
   for (const provider of memoryProviders) memory.register(provider);
+  const contexts = new ContextRegistry();
+  const contextProviders = contextProvider === undefined
+    ? []
+    : Array.isArray(contextProvider) ? contextProvider : [contextProvider];
+  for (const provider of contextProviders) contexts.register(provider);
   const evaluators = new EvaluatorRegistry();
   const events = new EventBus();
   const workflows = new Map<string, Workflow>();
@@ -82,6 +90,7 @@ export async function bootstrap(
     agents,
     tools,
     memory,
+    contexts,
     evaluators,
     events,
     workflows,

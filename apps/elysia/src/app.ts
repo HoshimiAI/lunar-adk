@@ -2,16 +2,17 @@ import { Elysia, t } from "elysia";
 import { SQL } from "bun";
 import { Planet, type PlanetScope, type SqlStore } from "@unknown-planet/sdk";
 import { AgentRunError, StorageConflictError, createRuntime, defineAgent } from "@lunar-adk/adk";
-import type { AgentConfig, AuthPrincipal, AuthProvider, EmbeddingProvider, MemoryProvider, Run, RuntimeHandle, RuntimeStreamEvent, Session, WorkflowRun } from "@lunar-adk/adk";
+import type { AgentConfig, AuthPrincipal, AuthProvider, EmbeddingProvider, MemoryProvider, Run, RuntimeHandle, RuntimeStreamEvent, Session, ToolCredentialProvider, WorkflowRun } from "@lunar-adk/adk";
 import { createOpenAIEmbeddingProvider, createOpenAIModelProvider } from "@lunar-adk/provider-openai";
 import { createSqliteStores } from "@lunar-adk/storage-sqlite";
 import { createHttpStores } from "@lunar-adk/storage-http";
 import { createBunSqlStores, type BunSqlDialect } from "@lunar-adk/storage-bun-sql";
 import { createBunSqlMemoryProvider } from "@lunar-adk/memory-bun-sql";
-import { createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar-adk/storage-unknown-planet";
+import { createUnknownPlanetContextProvider, createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar-adk/storage-unknown-planet";
 import { createBetterAuthProvider, type BetterAuthLike, type BetterAuthSession } from "@lunar-adk/auth-better-auth";
 import { createConsoleExporter, createOTLPExporter } from "@lunar-adk/observability-otel";
 import { createTelemetryMonitor, MONITOR_HTML, type TelemetryMonitor } from "./monitor";
+import { PLAYGROUND_HTML } from "./playground";
 import { elysiaTools } from "./tools";
 
 function encodeSse(event: string, data: unknown): Uint8Array {
@@ -59,10 +60,17 @@ function publicWorkflowRun(run: WorkflowRun): WorkflowRun {
   return run.error === undefined ? run : { ...run, error: PUBLIC_FAILURE };
 }
 
-async function sessionUsage(session: Session, runtime: RuntimeHandle) {
+async function sessionUsage(
+  session: Session,
+  runtime: RuntimeHandle,
+  scope: ReturnType<typeof principalScope>,
+  canReadRun: (run: Run) => boolean | Promise<boolean>,
+) {
   const runIds = [...new Set(session.runIds ?? session.runs?.map((run) => run.id) ?? [])];
-  const runs = (await Promise.all(runIds.map((id) => runtime.getStoredRun(id))))
+  const candidates = (await Promise.all(runIds.map((id) => runtime.getStoredRun(id, scope))))
     .filter((run): run is Run => run !== undefined && run.sessionId === session.id);
+  const runs = (await Promise.all(candidates.map(async (run) => await canReadRun(run) ? run : undefined)))
+    .filter((run): run is Run => run !== undefined);
   const inputTokens = runs.reduce((total, run) => total + run.usage.inputTokens, 0);
   const outputTokens = runs.reduce((total, run) => total + run.usage.outputTokens, 0);
   const durationMs = runs.reduce((total, run) => total + (run.endedAt === undefined ? 0 : Math.max(0, run.endedAt - run.startedAt)), 0);
@@ -110,8 +118,23 @@ function toSse(event: RuntimeStreamEvent): { name: string; data: unknown } {
   };
 }
 
+export type AppResource = "session" | "run" | "workflowRun";
+export type AppResourceAction = "read" | "update" | "fork" | "steer" | "queue" | "cancel" | "approve" | "reject" | "resume";
+
 export interface AppOptions {
   auth?: AuthProvider;
+  /** Resolve short-lived per-user credentials for tools through the host's vault. */
+  toolCredentials?: ToolCredentialProvider;
+  /**
+   * Apply host-application ACLs after tenant/workspace isolation. When set,
+   * this replaces the default owner-only check for these persisted resources.
+   */
+  authorizeResource?: (input: {
+    principal: AuthPrincipal;
+    resource: AppResource;
+    action: AppResourceAction;
+    value: Session | Run | WorkflowRun;
+  }) => boolean | Promise<boolean>;
   ready?: () => Promise<void>;
   authHandler?: (request: Request) => Response | Promise<Response>;
   authRoutePrefix?: string;
@@ -135,8 +158,12 @@ export interface AppOptions {
   agentTools?: NonNullable<AgentConfig["tools"]>;
   /** Provide a Planet client configured with the capabilities used by the app. */
   unknownPlanet?: { planet: Planet; scope: PlanetScope; memoryWriteMode?: "ingest" | "persist" };
+  /** Opt the default assistant into source-aware retrieval from an explicitly scoped Planet client. */
+  knowledgeContext?: { planet: Planet; scope: PlanetScope; retrieveLimit?: number };
   /** In-memory ADK trace view used by the monitor page. */
   telemetryMonitor?: TelemetryMonitor;
+  /** Enable the browser testing playground. Disabled by default for custom apps. */
+  playground?: boolean;
 }
 
 export interface DefaultAppOptions extends AppOptions {
@@ -172,8 +199,12 @@ function can(principal: AuthPrincipal | undefined, permission: string): boolean 
   return principal?.permissions.includes(permission) === true || principal?.permissions.includes("*") === true;
 }
 
-function belongsToPrincipal(value: { tenantId?: string; ownerId?: string } | undefined, principal: AuthPrincipal | undefined): boolean {
-  return !principal || (value?.tenantId === principal.tenantId && value.ownerId === principal.subjectId);
+function principalScope(principal: AuthPrincipal | undefined, includeOwner = true) {
+  return principal ? {
+    tenantId: principal.tenantId,
+    workspaceId: principal.workspaceId,
+    ...(includeOwner ? { ownerId: principal.subjectId } : {}),
+  } : undefined;
 }
 
 export interface RateLimitDecision {
@@ -263,17 +294,37 @@ function createRateLimiter(config: AppOptions["rateLimit"], store?: RateLimitSto
 }
 
 export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}) {
-  const sessionAllowed = async (sessionId: string | undefined, principal: AuthPrincipal | undefined) => {
+  const storageScope = (principal: AuthPrincipal | undefined) => principalScope(principal, !options.authorizeResource);
+  const resourceAllowed = async (
+    value: Session | Run | WorkflowRun | undefined,
+    principal: AuthPrincipal | undefined,
+    resource: AppResource,
+    action: AppResourceAction,
+  ) => {
+    if (!principal) return true;
+    if (!value || value.tenantId !== principal.tenantId || value.workspaceId !== principal.workspaceId) return false;
+    if (options.authorizeResource) return options.authorizeResource({ principal, resource, action, value });
+    return value.ownerId === principal.subjectId;
+  };
+  const sessionAllowed = async (
+    sessionId: string | undefined,
+    principal: AuthPrincipal | undefined,
+    action: AppResourceAction = "read",
+  ) => {
     if (!sessionId) return true;
-    const session = await runtime.getSession(sessionId);
-    if (session) return belongsToPrincipal(session, principal);
-    return belongsToPrincipal(runtime.getActiveRunForSession(sessionId), principal);
+    const scope = storageScope(principal);
+    const session = await runtime.getSession(sessionId, scope);
+    if (session) return resourceAllowed(session, principal, "session", action);
+    return resourceAllowed(runtime.getActiveRunForSession(sessionId), principal, "run", action);
   };
-  const runAllowed = async (runId: string, principal: AuthPrincipal | undefined) => {
-    const run = runtime.getRun(runId) ?? await runtime.getStoredRun(runId);
-    return belongsToPrincipal(run, principal);
+  const runAllowed = async (runId: string, principal: AuthPrincipal | undefined, action: AppResourceAction = "read") => {
+    const scope = storageScope(principal);
+    const run = runtime.getRun(runId) ?? await runtime.getStoredRun(runId, scope);
+    return resourceAllowed(run, principal, "run", action);
   };
-  const workflowAllowed = async (runId: string, principal: AuthPrincipal | undefined) => belongsToPrincipal(await runtime.getWorkflowRun(runId), principal);
+  const workflowAllowed = async (runId: string, principal: AuthPrincipal | undefined, action: AppResourceAction = "read") => resourceAllowed(
+    await runtime.getWorkflowRun(runId, storageScope(principal)), principal, "workflowRun", action,
+  );
   const rateLimiter = createRateLimiter(options.rateLimit, options.rateLimitStore);
   const app = new Elysia();
   if (options.authHandler) app.mount(options.authHandler);
@@ -358,7 +409,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
     .post(
       "/run/stream",
       async ({ body, request, set, principal }) => {
-        if (!(await sessionAllowed(body.sessionId, principal))) { set.status = 404; return { error: "Session not found" }; }
+        if (!(await sessionAllowed(body.sessionId, principal, "queue"))) { set.status = 404; return { error: "Session not found" }; }
         if (!runtime.supportsStreaming("assistant")) {
           set.status = 501;
           return { error: "Streaming is not supported by the configured model", code: "STREAMING_UNSUPPORTED" };
@@ -367,7 +418,9 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         const stream = runtime.stream("assistant", body.input, {
           sessionId: body.sessionId,
           tenantId: principal?.tenantId,
+          workspaceId: principal?.workspaceId,
           ownerId: principal?.subjectId,
+          principal,
           signal: request.signal,
         });
         const responseStream = new ReadableStream<Uint8Array>({
@@ -402,40 +455,62 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
       },
     )
     .get("/runs/:id", async ({ params, set, principal }) => {
-      const run = await runtime.getStoredRun(params.id);
-      if (!run || !belongsToPrincipal(run, principal)) {
+      const run = await runtime.getStoredRun(params.id, storageScope(principal));
+      if (!run || !await resourceAllowed(run, principal, "run", "read")) {
         set.status = 404;
         return { error: "Run not found" };
       }
       return { ...publicRun(run), ...runMetrics(run) };
     })
     .get("/sessions/:id", async ({ params, set, principal }) => {
-      const session = await runtime.getSession(params.id);
-      if (!session || !belongsToPrincipal(session, principal)) {
+      const session = await runtime.getSession(params.id, storageScope(principal));
+      if (!session || !await resourceAllowed(session, principal, "session", "read")) {
         set.status = 404;
         return { error: "Session not found" };
       }
-      return { ...session, ...(await sessionUsage(session, runtime)) };
+      return {
+        ...session,
+        ...(await sessionUsage(
+          session,
+          runtime,
+          storageScope(principal),
+          (run) => resourceAllowed(run, principal, "run", "read"),
+        )),
+      };
+    })
+    .patch("/sessions/:id", async ({ params, body, set, principal }) => {
+      if (!(await sessionAllowed(params.id, principal, "update"))) { set.status = 404; return { error: "Session not found" }; }
+      const title = body.title.trim();
+      if (!title || title.length > 120) { set.status = 422; return { error: "Title must contain 1 to 120 characters" }; }
+      const session = await runtime.renameSession(params.id, title, storageScope(principal));
+      if (!session) { set.status = 404; return { error: "Session not found" }; }
+      return { sessionId: session.id, title: session.title };
+    }, { body: t.Object({ title: t.String({ minLength: 1, maxLength: 120 }) }) })
+    .post("/sessions/:id/fork", async ({ params, set, principal }) => {
+      if (!(await sessionAllowed(params.id, principal, "fork"))) { set.status = 404; return { error: "Session not found" }; }
+      const session = await runtime.forkSession(params.id, storageScope(principal), principal?.subjectId);
+      if (!session) { set.status = 404; return { error: "Session not found" }; }
+      return { sessionId: session.id, parentSessionId: session.parentSessionId, title: session.title };
     })
     .post(
       "/workflows/:name/run",
       async ({ params, body, principal }) => {
-        const run = await runtime.runWorkflow(params.name, body.input, { tenantId: principal?.tenantId, ownerId: principal?.subjectId });
+      const run = await runtime.runWorkflow(params.name, body.input, { tenantId: principal?.tenantId, workspaceId: principal?.workspaceId, ownerId: principal?.subjectId, principal });
         return { workflowRunId: run.id, status: run.status, output: run.output, pendingApproval: run.pendingApproval };
       },
       { body: t.Object({ input: t.Optional(t.Unknown()) }) },
     )
     .get("/workflow-runs/:id", async ({ params, set, principal }) => {
-      const run = await runtime.getWorkflowRun(params.id);
-      if (!run || !belongsToPrincipal(run, principal)) {
+      const run = await runtime.getWorkflowRun(params.id, storageScope(principal));
+      if (!run || !await resourceAllowed(run, principal, "workflowRun", "read")) {
         set.status = 404;
         return { error: "Workflow run not found" };
       }
       return publicWorkflowRun(run);
     })
     .post("/workflow-runs/:id/cancel", async ({ params, set, principal }) => {
-      if (!(await workflowAllowed(params.id, principal))) { set.status = 404; return { error: "Workflow run not found" }; }
-      const run = await runtime.cancelWorkflow(params.id);
+      if (!(await workflowAllowed(params.id, principal, "cancel"))) { set.status = 404; return { error: "Workflow run not found" }; }
+      const run = await runtime.cancelWorkflow(params.id, storageScope(principal));
       if (!run) {
         set.status = 404;
         return { error: "Workflow run not found" };
@@ -445,15 +520,15 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
     .post(
       "/workflow-runs/:id/resume",
       async ({ params, body, set, principal }) => {
-        if (!(await workflowAllowed(params.id, principal))) { set.status = 404; return { error: "Workflow run not found" }; }
-        const run = await runtime.resumeWorkflow(params.id, body.approvalId);
+        if (!(await workflowAllowed(params.id, principal, "resume"))) { set.status = 404; return { error: "Workflow run not found" }; }
+        const run = await runtime.resumeWorkflow(params.id, body.approvalId, storageScope(principal), principal);
         return { workflowRunId: run.id, status: run.status, output: run.output, pendingApproval: run.pendingApproval };
       },
       { body: t.Object({ approvalId: t.Optional(t.String({ minLength: 1 })) }) },
     )
     .post("/runs/:id/cancel", async ({ params, set, principal }) => {
-      if (!(await runAllowed(params.id, principal))) { set.status = 404; return { error: "Run not found" }; }
-      const run = await runtime.cancel(params.id);
+      if (!(await runAllowed(params.id, principal, "cancel"))) { set.status = 404; return { error: "Run not found" }; }
+      const run = await runtime.cancel(params.id, storageScope(principal));
       if (!run) {
         set.status = 404;
         return { error: "Run not found" };
@@ -463,8 +538,8 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
     .post(
       "/runs/:id/approve",
       async ({ params, body, set, principal }) => {
-        if (!(await runAllowed(params.id, principal))) { set.status = 404; return { error: "Run not found" }; }
-        const result = await runtime.approve(params.id, body.approvalId);
+        if (!(await runAllowed(params.id, principal, "approve"))) { set.status = 404; return { error: "Run not found" }; }
+        const result = await runtime.approve(params.id, body.approvalId, storageScope(principal), principal);
         return {
           runId: result.run.id,
           status: result.run.status,
@@ -477,8 +552,8 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
     .post(
       "/runs/:id/reject",
       async ({ params, body, set, principal }) => {
-        if (!(await runAllowed(params.id, principal))) { set.status = 404; return { error: "Run not found" }; }
-        const run = await runtime.reject(params.id, body.approvalId);
+        if (!(await runAllowed(params.id, principal, "reject"))) { set.status = 404; return { error: "Run not found" }; }
+        const run = await runtime.reject(params.id, body.approvalId, storageScope(principal));
         return publicRun(run);
       },
       { body: t.Object({ approvalId: t.String({ minLength: 1 }) }) },
@@ -486,8 +561,8 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
     .post(
       "/sessions/:id/steer",
       async ({ params, body, set, principal }) => {
-        if (!(await sessionAllowed(params.id, principal))) { set.status = 404; return { error: "Session not found" }; }
-        const result = await runtime.steer(params.id, body.instruction);
+        if (!(await sessionAllowed(params.id, principal, "steer"))) { set.status = 404; return { error: "Session not found" }; }
+        const result = await runtime.steer(params.id, body.instruction, storageScope(principal));
         if ("status" in result) {
           set.status = 202;
           return result;
@@ -502,11 +577,13 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
     .post(
       "/sessions/:id/queue",
       async ({ params, body, set, principal }) => {
-        if (!(await sessionAllowed(params.id, principal))) { set.status = 404; return { error: "Session not found" }; }
+        if (!(await sessionAllowed(params.id, principal, "queue"))) { set.status = 404; return { error: "Session not found" }; }
         const result = await runtime.run("assistant", body.message, {
           sessionId: params.id,
           tenantId: principal?.tenantId,
+          workspaceId: principal?.workspaceId,
           ownerId: principal?.subjectId,
+          principal,
         });
         return {
           output: result.output,
@@ -528,7 +605,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         const expiresAt = new Date(body.expiresAt).getTime();
         if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) { set.status = 422; return { error: "expiresAt must be in the future" }; }
         const embedding = provider.capabilities?.embeddingOwner === "provider" ? undefined : options.embedding ? await options.embedding.embed(body.content) : undefined;
-        const record = await provider.store({ content: body.content, namespace: body.namespace, metadata: body.metadata, tenantId: principal!.tenantId, ownerId: principal!.subjectId, expiresAt, ...(embedding ? { embedding } : {}) });
+        const record = await provider.store({ content: body.content, namespace: body.namespace, metadata: body.metadata, tenantId: principal!.tenantId, workspaceId: principal!.workspaceId, ownerId: principal!.subjectId, expiresAt, ...(embedding ? { embedding } : {}) });
         set.status = 201;
         return record;
       },
@@ -568,6 +645,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
               content: chunk,
               namespace: body.namespace,
               tenantId: principal!.tenantId,
+              workspaceId: principal!.workspaceId,
               ownerId: principal!.subjectId,
               expiresAt,
               ...(embeddings ? { embedding: embeddings[index]! } : {}),
@@ -597,7 +675,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         set.status = 422;
         return { error: "limit must be an integer from 1 to 100" };
       }
-      return provider.list({ tenantId: principal!.tenantId, ownerId: principal!.subjectId, namespace: query.namespace, cursor: query.cursor, limit });
+      return provider.list({ tenantId: principal!.tenantId, workspaceId: principal!.workspaceId, ownerId: principal!.subjectId, namespace: query.namespace, cursor: query.cursor, limit });
     }, { query: t.Object({ namespace: t.Optional(t.String()), cursor: t.Optional(t.String()), limit: t.Optional(t.String()) }) })
     .post("/memories/search", async ({ body, principal, set }) => {
       if (!can(principal, "memory:read")) { set.status = 403; return { error: "Forbidden" }; }
@@ -607,6 +685,7 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
       const records = await provider.retrieve({
         text: body.text,
         tenantId: principal!.tenantId,
+        workspaceId: principal!.workspaceId,
         ownerId: principal!.subjectId,
         namespace: body.namespace,
         limit: body.limit,
@@ -616,18 +695,20 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
     }, { body: t.Object({ text: t.String({ minLength: 1, maxLength: 4_000 }), namespace: t.Optional(t.String()), limit: t.Optional(t.Number({ minimum: 1, maximum: 100 })) }) })
     .delete("/memories/:id", async ({ params, principal, set }) => {
       if (!can(principal, "memory:delete")) { set.status = 403; return { error: "Forbidden" }; }
-      const removed = await runtime.getMemoryProvider()?.delete?.(params.id, principal!.tenantId, principal!.subjectId);
+      const removed = await runtime.getMemoryProvider()?.delete?.(params.id, principal!.tenantId, principal!.subjectId, principal!.workspaceId);
       if (!removed) { set.status = 404; return { error: "Memory not found" }; }
       return { id: params.id, deleted: true };
     })
     .post(
       "/run",
       async ({ body, principal, set }) => {
-        if (!(await sessionAllowed(body.sessionId, principal))) { set.status = 404; return { error: "Session not found" }; }
+        if (!(await sessionAllowed(body.sessionId, principal, "queue"))) { set.status = 404; return { error: "Session not found" }; }
         const result = await runtime.run("assistant", body.input, {
           sessionId: body.sessionId,
           tenantId: principal?.tenantId,
+          workspaceId: principal?.workspaceId,
           ownerId: principal?.subjectId,
+          principal,
         });
         return {
           output: result.output,
@@ -645,6 +726,11 @@ export async function createApp(runtime: RuntimeHandle, options: AppOptions = {}
         }),
       },
     );
+  if (options.playground) {
+    configuredApp.get("/playground", () => new Response(PLAYGROUND_HTML, {
+      headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    }));
+  }
   if (options.telemetryMonitor) {
     configuredApp
       .get("/monitor", () => new Response(MONITOR_HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } }))
@@ -766,6 +852,9 @@ export async function createDefaultApp(options: DefaultAppOptions = {}) {
     : memoryProviderName === "postgres"
       ? await createBunSqlMemoryProvider({ connection: process.env.MEMORY_DATABASE_URL ?? process.env.DATABASE_URL ?? (() => { throw new Error("MEMORY_DATABASE_URL or DATABASE_URL is required when MEMORY_PROVIDER=postgres"); })() })
       : undefined;
+  const contextProvider = options.knowledgeContext
+    ? createUnknownPlanetContextProvider({ planet: options.knowledgeContext.planet, scope: options.knowledgeContext.scope })
+    : undefined;
   const embedding = createOpenAIEmbeddingProvider({
     apiKey,
     model: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
@@ -782,7 +871,9 @@ export async function createDefaultApp(options: DefaultAppOptions = {}) {
   const runtime = await createRuntime({
     storage,
     ownsStorage: true,
+    ...(options.toolCredentials ? { toolCredentials: options.toolCredentials } : {}),
     ...(memoryProvider ? { memory: memoryProvider, ownsMemory: true } : {}),
+    ...(contextProvider ? { context: contextProvider } : {}),
     embedding,
     observability: {
       exporters,
@@ -799,12 +890,16 @@ export async function createDefaultApp(options: DefaultAppOptions = {}) {
       systemPrompt: "You are a helpful assistant. Use current_time for the current UTC time and calculate for arithmetic instead of guessing.",
       tools: [...elysiaTools, ...(options.agentTools ?? [])],
       ...(memoryProvider ? { memory: { providerId: memoryProvider.id, namespace: process.env.MEMORY_NAMESPACE ?? "assistant", retrieveLimit: Number(process.env.MEMORY_RETRIEVE_LIMIT ?? 5), store: "none" as const } } : {}),
+      ...(contextProvider ? { context: { providerId: contextProvider.id, retrieveLimit: options.knowledgeContext?.retrieveLimit ?? 5 } } : {}),
     }),
   );
   await options.configureRuntime?.(runtime);
 
   const app = await createApp(runtime, {
     ...options,
+    playground: options.playground ?? (process.env.LUNAR_PLAYGROUND === undefined
+      ? process.env.NODE_ENV !== "production"
+      : process.env.LUNAR_PLAYGROUND === "true"),
     telemetryMonitor,
     rateLimit,
     embedding: options.embedding ?? embedding,

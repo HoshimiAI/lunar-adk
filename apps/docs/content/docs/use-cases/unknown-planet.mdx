@@ -1,13 +1,82 @@
 ---
-title: "Use case: Unknown Planet storage"
-description: Persist runs, sessions, and workflows in scoped PostgreSQL storage
+title: "Use case: Unknown Planet integration"
+description: Retrieve attributed knowledge context and optionally persist Lunar runs in scoped Planet storage
 ---
+
+## Source-aware knowledge context
+
+Lunar ADK owns execution and prompt construction. Unknown Planet owns ingestion,
+scoped provider routing, retrieval, and source attribution. The Lunar adapter
+uses a caller-supplied `Planet` client and never creates database clients,
+installs database drivers, or runs Unknown Planet migrations.
+
+Configure the Planet client with the capabilities your knowledge corpus uses,
+then register its scoped context provider with the runtime. Agents opt in and
+set their own retrieval limit:
+
+```ts
+import { createRuntime, defineAgent } from '@lunar-adk/adk';
+import { createUnknownPlanetContextProvider } from '@lunar-adk/storage-unknown-planet';
+
+const scope = { tenantId: 'acme', workspaceId: 'research' };
+const context = createUnknownPlanetContextProvider({ planet, scope });
+const runtime = await createRuntime({ context });
+runtime.registerAgent(defineAgent({
+  name: 'researcher',
+  model,
+  context: { providerId: context.id, retrieveLimit: 6 },
+}));
+
+const result = await runtime.run('researcher', 'What supports this claim?', {
+  tenantId: scope.tenantId,
+  workspaceId: scope.workspaceId,
+});
+const citations = result.run.events.find((event) => event.name === 'context.retrieved')?.payload;
+```
+
+Retrieved source text is marked as untrusted context and labeled in stable
+result order (`[S1]`, `[S2]`, ...), with an instruction to cite those labels.
+The `context.retrieved` run event stores the provider ID and source references,
+including document title, content URI, and chunk offsets when Planet has them.
+Retries reuse the same retrieved context; approval and continuation runs keep
+the original labels and attribution. A tenant mismatch fails closed. If the
+configured Planet client lacks queryable graph or chunk capabilities,
+retrieval returns no context.
+
+The Elysia example can opt in by passing `knowledgeContext: { planet, scope }`
+to `createDefaultApp`; it does not run a database migration for retrieval.
+
+## Optional run and workflow persistence
 
 Use `@lunar-adk/storage-unknown-planet` when runs, sessions, and workflow state
 must survive process restarts in PostgreSQL while remaining scoped to a Planet
 tenant or workspace. The adapter uses PostgreSQL transactions and
 revision-aware writes; its storage bundle atomically saves a run with its
 session.
+
+## Compose the adapters
+
+When a service uses more than one Planet capability, create the adapters from
+one client and scope. Select only the adapters the runtime needs:
+
+```ts
+import { createRuntime } from '@lunar-adk/adk';
+import { createUnknownPlanetAdapters, migrateUnknownPlanetStorage } from '@lunar-adk/storage-unknown-planet';
+
+const scope = { tenantId: 'acme', workspaceId: 'research' };
+await migrateUnknownPlanetStorage({ planet }); // required only for SQL storage
+
+const runtime = await createRuntime(createUnknownPlanetAdapters({
+  planet,
+  scope,
+  storage: true,
+  memory: { writeMode: 'persist' },
+  context: true,
+}));
+```
+
+The factory does not configure Planet providers, open connections, or run
+migrations. Keep the Planet client and its providers application-owned.
 
 ## Create the storage bundle
 

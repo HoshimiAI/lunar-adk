@@ -7,8 +7,11 @@ import type { Run, RunContinuation } from "../run";
 import type { LunarEvent } from "../event";
 import type { MemoryProvider } from "../memory";
 import type { PolicyEnforcer } from "../policy";
+import type { RetrievedContextAttribution } from "../context";
 import type { ModelCallOptions, ModelResponse, ModelToolCall } from "../model";
 import type { ToolResult } from "../tool";
+import type { AuthPrincipal } from "../auth";
+import type { ToolCredentialProvider } from "../tool";
 
 /** Read-only lifecycle callbacks for observing agent execution. Throwing from a hook fails the run. */
 export interface AgentHooks {
@@ -28,6 +31,11 @@ export interface AgentMemoryConfig {
   filter?: Record<string, unknown>;
 }
 
+export interface AgentContextConfig {
+  providerId?: string;
+  retrieveLimit?: number;
+}
+
 export interface AgentConfig {
   name: string;
   model: ModelProvider;
@@ -37,6 +45,8 @@ export interface AgentConfig {
   retryPolicy?: RetryPolicy;
   maxContextTokens?: number;
   memory?: boolean | AgentMemoryConfig;
+  /** Opt into source-aware knowledge retrieval registered on the runtime. */
+  context?: boolean | AgentContextConfig;
   hooks?: AgentHooks;
 }
 
@@ -45,7 +55,12 @@ export interface AgentRunOptions {
   history?: ModelMessage[];
   sessionId?: string;
   tenantId?: string;
+  workspaceId?: string;
   ownerId?: string;
+  /** Identity derived from host-verified authentication; used only for this execution, never persisted. */
+  principal?: AuthPrincipal;
+  /** @internal Injected by RuntimeConfig; callers should configure credentials on the runtime. */
+  toolCredentialProvider?: ToolCredentialProvider;
   eventBus?: EventBus;
   continuation?: RunContinuation;
   resumeRun?: Run<string>;
@@ -58,6 +73,8 @@ export interface AgentRunOptions {
   onInterrupted?: (continuation: RunContinuation) => void;
   onSteered?: (event: { interruptedRunId: string; continuationRunId: string; sessionId: string }) => void;
   memoryProvider?: MemoryProvider;
+  /** Runtime supplied attribution for context already injected into this run. */
+  retrievedContext?: RetrievedContextAttribution;
   /** Internal runtime policy hook applied before agent and tool execution. */
   policy?: PolicyEnforcer;
 }
@@ -72,5 +89,6 @@ export interface Agent {
   modelId?: string;
   supportsStreaming?: boolean;
   memory?: AgentMemoryConfig;
+  context?: AgentContextConfig;
   run(input: string, options?: AgentRunOptions): Promise<AgentRunResult>;
 }

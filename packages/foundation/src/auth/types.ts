@@ -1,6 +1,7 @@
 export interface AuthPrincipal {
   subjectId: string;
   tenantId: string;
+  workspaceId?: string;
   permissions: readonly string[];
 }
 

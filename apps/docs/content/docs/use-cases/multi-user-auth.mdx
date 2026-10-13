@@ -1,0 +1,76 @@
+---
+title: "Use case: multi-user host integration"
+description: Bind host users, tenant scope, resource ACLs, and tool credentials to Lunar
+---
+
+Lunar uses an authenticated principal for tenant/workspace storage scope. The
+host owns login, organization membership, project ACLs, and credentials for
+external tools. The same arrangement works for Kano, an agent harness, or a
+future application with a different permission model.
+
+```ts
+import { createRuntime } from '@lunar-adk/adk';
+import { createApp } from './app'; // application's Elysia integration module
+
+const auth = {
+  async authenticate(request: Request) {
+    const identity = await hostAuth.verifyRequest(request);
+    if (!identity) return undefined;
+    const membership = await organizations.requireMembership(identity.userId);
+    return {
+      subjectId: identity.userId,
+      tenantId: membership.organizationId,
+      workspaceId: identity.activeProjectId,
+      permissions: membership.permissions,
+    };
+  },
+};
+
+const runtime = await createRuntime({
+  storage: hostConfiguredStorage,
+  toolCredentials: {
+    async resolve({ principal, toolName, credentialId, scopes }) {
+      return credentialVault.getAccessToken({
+        userId: principal.subjectId,
+        tenantId: principal.tenantId,
+        toolName,
+        credentialId,
+        scopes,
+      });
+    },
+  },
+});
+
+const app = await createApp(runtime, {
+  auth,
+  authorizeResource: ({ principal, resource, action, value }) =>
+    hostAccess.canPerform({
+      userId: principal.subjectId,
+      organizationId: value.tenantId,
+      projectId: value.workspaceId,
+      resource,
+      resourceId: value.id,
+      action,
+    }),
+});
+```
+
+`hostAuth`, `organizations`, `credentialVault`, and `hostAccess` represent
+application-owned modules. For Kano, `hostAccess` can query its project/task
+membership and sharing rules. A harness can instead check its workspace or
+session ACL. Lunar first enforces tenant/workspace equality, then calls the
+host ACL for each resource action; an absent callback keeps sessions, runs,
+and workflow runs owner-only.
+
+The authenticated principal is passed only to the current run. Workflow
+sub-agent calls and tool approvals use the principal from the current request.
+When resuming after a restart, authenticate again and pass the new principal;
+background workflow recovery has no user credential context. Credential
+references belong in trusted tool code, and the host credential vault checks
+the user, tool, and requested scopes before returning a short-lived access
+token. Keep OAuth refresh tokens outside Lunar state and model-visible data.
+
+An application may also own the storage adapter and database. Configure its
+tenant/workspace scope from verified host identity, and preserve that scope in
+the adapter for every lookup and write. Lunar does not require a particular
+database or impose Kano's organization/project schema.

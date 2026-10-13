@@ -1,7 +1,7 @@
 import type { LunarEvent } from "../event";
 import type { PendingApproval, Run, RunContinuation } from "./types";
 
-export function createRun<Result = unknown>(metadata: Pick<Run<Result>, "agent" | "model" | "sessionId" | "parentRunId" | "tenantId" | "ownerId"> = {}): Run<Result> {
+export function createRun<Result = unknown>(metadata: Pick<Run<Result>, "agent" | "model" | "sessionId" | "parentRunId" | "tenantId" | "workspaceId" | "ownerId"> = {}): Run<Result> {
   return {
     id: crypto.randomUUID(),
     ...metadata,

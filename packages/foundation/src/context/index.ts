@@ -7,7 +7,9 @@ export { estimateTokens } from "./budget";
 export { selectRecent } from "./select";
 export { truncate } from "./compress";
 export { shapeToolResult } from "./tool-result-shape";
-export type { ContextBudget, BuiltContext } from "./types";
+export { ContextRegistry } from "./registry";
+export { ContextScopeMismatchError } from "./types";
+export type { ContextBudget, BuiltContext, ContextProvider, ContextQuery, ContextSource, ContextSourceReference, RetrievedContextAttribution, SourceContextRecord } from "./types";
 
 export function buildContext(messages: ModelMessage[], budget: ContextBudget): BuiltContext {
   let selected = messages;

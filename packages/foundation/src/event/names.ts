@@ -17,6 +17,8 @@ export const EVENT_NAMES = [
   "memory.created",
   "memory.retrieved",
   "memory.failed",
+  "context.retrieved",
+  "context.failed",
   "plugin.registered",
   "plugin.enabled",
   "plugin.disabled",

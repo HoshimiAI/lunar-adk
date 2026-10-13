@@ -121,6 +121,9 @@ Packages: `@lunar-adk/foundation/auth`, `@lunar-adk/foundation/observability`, a
 - `AuthPrincipal` identifies a subject, tenant, and permissions; implement
   `AuthProvider.authenticate(request)` to integrate an application identity
   system.
+- `ToolCredentialProvider` resolves short-lived tool credentials for a
+  verified principal and tool. Configure it on `RuntimeConfig.toolCredentials`;
+  raw secrets must remain in the host credential vault.
 - `ObservabilityHub` delivers event and run records to configured exporters.
   `ObservabilityConfig` accepts exporters and the opt-in `captureContent` flag.
 - `StorageBundle` combines run, session, and workflow stores. Its capability

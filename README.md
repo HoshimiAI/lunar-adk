@@ -14,11 +14,11 @@ Release status: v1.2 code-first workflows and managed subagents.
 - [`packages/storage-http`](packages/storage-http) — `@lunar-adk/storage-http`, remote HTTP run, session, and workflow storage.
 - [`packages/storage-bun-sql`](packages/storage-bun-sql) — `@lunar-adk/storage-bun-sql`, Bun.SQL storage for SQLite, PostgreSQL, MySQL, and MariaDB.
 - [`packages/storage-mongo`](packages/storage-mongo) — `@lunar-adk/storage-mongo`, MongoDB collection adapter using an application-provided Mongo SDK client.
-- [`packages/storage-unknown-planet`](packages/storage-unknown-planet) — `@lunar-adk/storage-unknown-planet`, run/session/workflow storage and scoped memory for Unknown Planet.
+- [`packages/storage-unknown-planet`](packages/storage-unknown-planet) — `@lunar-adk/storage-unknown-planet`, source-aware knowledge context, run/session/workflow storage, and scoped memory for Unknown Planet.
 - [`packages/mcp`](packages/mcp) — `@lunar-adk/mcp`, MCP tools for queueing and steering session messages.
 - [`packages/memory-sqlite`](packages/memory-sqlite) — `@lunar-adk/memory-sqlite`, durable SQLite memory records.
 - [`packages/observability-otel`](packages/observability-otel) — `@lunar-adk/observability-otel`, console and OTLP telemetry exporters.
-- [`apps/elysia`](apps/elysia) — API-only Elysia HTTP adapter and runnable application.
+- [`apps/elysia`](apps/elysia) — Elysia HTTP adapter and runnable application with an optional testing playground.
 
 ## Install
 
@@ -44,9 +44,13 @@ dependencies. Live checks require an explicitly provided restricted API key:
 LUNAR_ALLOW_UNAUTHENTICATED=true bun --cwd apps/elysia run dev
 ```
 
-The service is API-only and listens on `127.0.0.1` by default. Health checks
-are available at `GET /health`. Public deployments must pass an `AuthProvider`
-to `createDefaultApp()`; the unauthenticated setting is an explicit local opt-in.
+The service listens on `127.0.0.1` by default. In non-production mode,
+`GET /playground` provides a browser UI for running the assistant, continuing
+sessions, and approving or rejecting tools. It uses the app's normal auth and
+API routes. Set `LUNAR_PLAYGROUND=false` to disable it, or `true` to enable it
+explicitly. Health checks are available at `GET /health`. Public deployments
+must pass an `AuthProvider` to `createDefaultApp()`; unauthenticated access is
+an explicit local opt-in.
 
 The Elysia assistant includes safe `current_time` and `calculate` tools. Try
 asking “What time is it in UTC?” or “Calculate (18 + 6) / 3.”

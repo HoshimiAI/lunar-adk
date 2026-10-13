@@ -1,10 +1,11 @@
 import type { Session } from "./types";
 import type { SaveOptions } from "../storage/types";
 import { StorageConflictError } from "../storage/error";
+import type { StorageScope } from "../storage/types";
 
 export interface SessionStore {
   save(session: Session, options?: SaveOptions): Promise<Session>;
-  get(id: string): Promise<Session | undefined>;
+  get(id: string, scope?: StorageScope): Promise<Session | undefined>;
 }
 
 export class InMemorySessionStore implements SessionStore {

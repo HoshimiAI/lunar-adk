@@ -1,11 +1,12 @@
 import type { WorkflowRun } from "./types";
 import type { SaveOptions } from "../storage/types";
 import { StorageConflictError } from "../storage/error";
+import type { StorageScope } from "../storage/types";
 
 export interface WorkflowStore {
   save(run: WorkflowRun, options?: SaveOptions): Promise<WorkflowRun>;
-  get(id: string): Promise<WorkflowRun | undefined>;
-  listRecoverable?(): Promise<WorkflowRun[]>;
+  get(id: string, scope?: StorageScope): Promise<WorkflowRun | undefined>;
+  listRecoverable?(scope?: StorageScope): Promise<WorkflowRun[]>;
 }
 
 export class InMemoryWorkflowStore implements WorkflowStore {

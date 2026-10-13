@@ -2,6 +2,55 @@
 
 `@lunar-adk/storage-unknown-planet` implements Lunar's `StorageBundle` with a scoped Unknown Planet `Planet` client. Its SQL capability must use PostgreSQL transactions.
 
+## Compose adapters with one client and scope
+
+Select only the capabilities your runtime uses. The factory shares the same explicit client and tenant/workspace scope across the selected adapters; the application still owns Planet configuration, connection lifecycle, and storage migration.
+
+```ts
+import { createRuntime } from "@lunar-adk/adk";
+import { createUnknownPlanetAdapters, migrateUnknownPlanetStorage } from "@lunar-adk/storage-unknown-planet";
+
+const scope = { tenantId: "acme", workspaceId: "research" };
+await migrateUnknownPlanetStorage({ planet }); // only when selecting SQL storage
+
+const adapters = createUnknownPlanetAdapters({
+  planet,
+  scope,
+  storage: true,
+  memory: { writeMode: "persist" },
+  context: true,
+});
+const runtime = await createRuntime(adapters);
+```
+
+Use `storage: true`, `memory: { ... }`, and `context: true` independently; leave out adapters that the runtime does not need. Context retrieval does not require the storage migration. Stop the runtime before closing the caller-owned Planet providers.
+
+## Source-aware knowledge context
+
+Use the context adapter to retrieve attributed knowledge through an already configured, scoped Planet client. Lunar owns agent execution and prompt context; Planet owns provider routing, ingestion, retrieval, and source attribution. This adapter does not construct database clients, add database drivers, or run migrations for retrieval.
+
+```ts
+import { createRuntime, defineAgent } from "@lunar-adk/adk";
+import { createUnknownPlanetContextProvider } from "@lunar-adk/storage-unknown-planet";
+
+const scope = { tenantId: "acme", workspaceId: "research" };
+const context = createUnknownPlanetContextProvider({ planet, scope });
+const runtime = await createRuntime({ context });
+runtime.registerAgent(defineAgent({
+  name: "researcher",
+  model,
+  context: { providerId: context.id, retrieveLimit: 6 },
+}));
+
+const result = await runtime.run("researcher", "What supports this claim?", {
+  tenantId: scope.tenantId,
+  workspaceId: scope.workspaceId,
+});
+const attribution = result.run.events.find((event) => event.name === "context.retrieved")?.payload;
+```
+
+Retrieved content is passed as untrusted context. Stable source labels and their references are retained in the `context.retrieved` run event for citations. Configure Planet's query capabilities on the caller-owned client; no database migration is needed for context retrieval.
+
 ```ts
 import { createUnknownPlanetMemoryProvider, createUnknownPlanetStorage, migrateUnknownPlanetStorage } from "@lunar-adk/storage-unknown-planet";
 
@@ -13,7 +62,7 @@ const runtime = await createRuntime({ storage, memory });
 
 The migration creates `lunar.runs`, `lunar.sessions`, and `lunar.workflow_runs`. It is additive and safe to rerun. Apply it before serving traffic. Keep the schema when rolling back application code so existing runs and sessions remain available; removing it is a separate data deletion decision.
 
-The caller owns the `Planet` instance and its database connection. Construct a storage bundle for each authenticated tenant or workspace. The adapter enforces that scope on every SQL operation. A database integration check runs when `UP_TEST_DATABASE_URL` points to a dedicated PostgreSQL database.
+The caller owns the `Planet` instance and its database connection. Configure a tenant scope on the adapters; tenant-only scopes can select the authenticated workspace per operation. When a workspace is configured, the adapters enforce that workspace on every operation. The Elysia app carries the principal's tenant, workspace, and user ID through run, session, workflow, and memory operations. Session history and saved runs belong to the creating user; workspace scope keeps their records in the right database partition. Unknown Planet remains the only component here that owns database orchestration. A database integration check runs when `UP_TEST_DATABASE_URL` points to a dedicated PostgreSQL database.
 
 From the repository root, start the dedicated local test database and run the integration check:
 

@@ -14,6 +14,8 @@ import { WorkflowApprovalRequired } from "../workflow";
 import { ObservabilityHub } from "../observability";
 import { createPolicyEnforcer } from "../policy";
 import { StorageConflictError } from "../storage";
+import type { StorageScope } from "../storage";
+import { ContextScopeMismatchError } from "../context";
 
 export type { RuntimeConfig, RuntimeHandle, SteeringResult } from "./types";
 export type { RuntimeStreamEvent } from "./types";
@@ -60,7 +62,9 @@ interface ActiveRun {
   run: Run<string>;
   sessionId: string;
   tenantId?: string;
+  workspaceId?: string;
   ownerId?: string;
+  principal?: import("../auth").AuthPrincipal;
   agentName: string;
   input: string;
   continuation?: RunContinuation;
@@ -72,6 +76,9 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   const configuredMemoryProviders = config.memory === undefined
     ? []
     : Array.isArray(config.memory) ? config.memory : [config.memory];
+  const configuredContextProviders = config.context === undefined
+    ? []
+    : Array.isArray(config.context) ? config.context : [config.context];
   if (config.ownsMemory && configuredMemoryProviders.length === 0) {
     throw new Error("ownsMemory requires a configured memory provider");
   }
@@ -82,11 +89,12 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   if (storage?.capabilities?.atomicRunSession && !storage.saveRunAndSession) {
     throw new Error("Storage declares atomic run/session support without implementing saveRunAndSession");
   }
-  const bootstrapped = await bootstrap({ plugins: resolved.plugins, policyRules: config.policyRules ?? [] }, config.memory);
+  const bootstrapped = await bootstrap({ plugins: resolved.plugins, policyRules: config.policyRules ?? [] }, config.memory, config.context);
   const enforcePolicy = createPolicyEnforcer(bootstrapped.policyRules);
-  const { agents, events, memory, workflows } = bootstrapped;
+  const { agents, events, memory, contexts, workflows } = bootstrapped;
   let pluginStatus: "enabled" | "disabled" = "enabled";
   const defaultMemoryProviderId = configuredMemoryProviders[0]?.id ?? "in-memory";
+  const defaultContextProviderId = configuredContextProviders[0]?.id;
   const runs = new Map<string, Run>();
   const activeRuns = new Map<string, ActiveRun>();
   const useStorageBundle = Boolean(storage);
@@ -98,6 +106,14 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
   const activeWorkflows = new Map<string, { controller: AbortController; promise: Promise<WorkflowRun> }>();
   let workflowRecovery: Promise<WorkflowRun[]> | undefined;
   const sessionLocks = new Map<string, Promise<void>>();
+
+  function matchesScope(value: { tenantId?: string; workspaceId?: string; ownerId?: string }, scope?: StorageScope): boolean {
+    return !scope || (
+      (scope.tenantId === undefined || value.tenantId === scope.tenantId) &&
+      (scope.workspaceId === undefined || value.workspaceId === scope.workspaceId) &&
+      (scope.ownerId === undefined || value.ownerId === scope.ownerId)
+    );
+  }
 
   async function withSessionLock<Result>(sessionId: string, operation: () => Promise<Result>): Promise<Result> {
     const previous = sessionLocks.get(sessionId) ?? Promise.resolve();
@@ -156,7 +172,56 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     if (agent.memory && !memoryProvider) {
       throw new Error(`Unknown memory provider: ${agent.memory.providerId ?? defaultMemoryProviderId}`);
     }
+    const contextProvider = agent.context
+      ? contexts.get(agent.context.providerId ?? defaultContextProviderId ?? "")
+      : undefined;
+    if (agent.context && !contextProvider) {
+      throw new Error(`Unknown context provider: ${agent.context.providerId ?? defaultContextProviderId ?? "(none)"}`);
+    }
     let memoryHistory: Array<{ role: "system"; content: string }> = [];
+    let contextHistory: Array<{ role: "user"; content: string }> = [];
+    let retrievedContext: import("../context").RetrievedContextAttribution | undefined =
+      options.retrievedContext ?? options.continuation?.retrievedContext;
+    if (contextProvider && !options.continuation && !existingRun) {
+      try {
+        const configuredLimit = agent.context?.retrieveLimit;
+        const limit = Number.isFinite(configuredLimit) ? Math.max(1, Math.min(configuredLimit!, 100)) : 5;
+        const records = (await contextProvider.retrieve({
+          text: input,
+          limit,
+          tenantId: options.tenantId ?? session.tenantId,
+          workspaceId: options.workspaceId ?? session.workspaceId,
+          ownerId: options.ownerId ?? session.ownerId,
+        })).slice(0, limit);
+        const sources: import("../context").ContextSourceReference[] = [];
+        const blocks: string[] = [];
+        let sourceIndex = 0;
+        for (const record of records) {
+          const recordSources = record.sources.length ? record.sources : [{ id: record.id }];
+          const labeledSources = recordSources.map((source) => {
+            const label = `S${++sourceIndex}`;
+            const reference = { ...source, label };
+            sources.push(reference);
+            return reference;
+          });
+          // Keep the attribution label stable (`S1`) while showing the exact citation form to the model.
+          blocks.push(JSON.stringify({
+            sources: labeledSources.map((source) => ({ ...source, label: `[${source.label}]` })),
+            content: record.content,
+          }));
+        }
+        if (blocks.length) {
+          retrievedContext = { providerId: contextProvider.id, sources };
+          contextHistory = [{
+            role: "user",
+            content: `Retrieved source context (JSON data; labels are citation handles):\n${blocks.join("\n")}`,
+          }];
+        }
+      } catch (error) {
+        events.emit("context.failed", { agent: agent.name, providerId: contextProvider.id, error: error instanceof Error ? error.message : String(error) });
+        if (error instanceof ContextScopeMismatchError) throw error;
+      }
+    }
     if (memoryProvider && !options.continuation && !existingRun) {
       try {
         const memories = await memoryProvider.retrieve({
@@ -165,8 +230,9 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           limit: agent.memory?.retrieveLimit ?? 5,
           namespace: agent.memory?.namespace,
           filter: agent.memory?.filter,
-          tenantId: options.tenantId,
-          ownerId: options.ownerId,
+          tenantId: options.tenantId ?? session.tenantId,
+          workspaceId: options.workspaceId ?? session.workspaceId,
+          ownerId: options.ownerId ?? session.ownerId,
         });
         if (memories.length > 0) {
           memoryHistory = [{
@@ -190,6 +256,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       sessionId: session.id,
       parentRunId: options.parentRunId,
       tenantId: options.tenantId ?? session.tenantId,
+      workspaceId: options.workspaceId ?? session.workspaceId,
       ownerId: options.ownerId ?? session.ownerId,
     });
     const sessionForRun = options.continuation
@@ -204,16 +271,20 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       run: startRun(seed),
       sessionId: session.id,
       tenantId: options.tenantId ?? session.tenantId,
+      workspaceId: options.workspaceId ?? session.workspaceId,
       ownerId: options.ownerId ?? session.ownerId,
+      principal: options.principal,
       agentName,
       input,
       onSteered: options.onSteered,
     };
     const promise = agent.run(input, {
       ...options,
+      toolCredentialProvider: config.toolCredentials,
       policy: enforcePolicy,
       sessionId: session.id,
-      history: options.continuation ? options.history : [...memoryHistory, ...session.history],
+      history: options.continuation ? options.history : [...memoryHistory, ...session.history, ...contextHistory],
+      ...(retrievedContext ? { retrievedContext } : {}),
       signal: controller.signal,
       eventBus: events,
       initialRun: existingRun ? undefined : seed,
@@ -236,6 +307,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
             namespace: agent.memory?.namespace,
             metadata: { ...agent.memory?.filter, agent: agent.name, ...(session.id ? { sessionId: session.id } : {}) },
             tenantId: options.tenantId ?? session.tenantId,
+            workspaceId: options.workspaceId ?? session.workspaceId,
             ownerId: options.ownerId ?? session.ownerId,
           });
           events.emit("memory.created", { agent: agent.name, providerId: memoryProvider.id, memoryId: record.id });
@@ -265,7 +337,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     return saved;
   }
 
-  async function executeWorkflow(workflow: Workflow, input: unknown, existing?: WorkflowRun, approvedApprovalId?: string, tenantId?: string, ownerId?: string): Promise<WorkflowRun> {
+  async function executeWorkflow(workflow: Workflow, input: unknown, existing?: WorkflowRun, approvedApprovalId?: string, tenantId?: string, ownerId?: string, workspaceId?: string, principal?: import("../auth").AuthPrincipal): Promise<WorkflowRun> {
     const controller = new AbortController();
     const run: WorkflowRun = existing
       ? {
@@ -291,6 +363,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           approvedApprovalIds: [],
           ...(tenantId ? { tenantId } : {}),
           ...(ownerId ? { ownerId } : {}),
+          ...(workspaceId ? { workspaceId } : {}),
     };
     await saveWorkflow(run);
     events.emit("workflow.started", { workflow: workflow.name, workflowRunId: run.id, resumed: Boolean(existing) });
@@ -301,6 +374,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       state: run.state,
       signal: controller.signal,
       run,
+      principal,
       resumeFrom: latest,
       async checkpoint(name, state = context.state) {
         const checkpoint = { name, state: { ...state }, createdAt: Date.now() };
@@ -324,14 +398,16 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
         if (!agent) throw new Error(`Unknown agent: ${String(agentRef)}`);
         const sessionId = options.sessionId;
         const session = sessionId
-          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(tenantId, run.ownerId), id: sessionId })
-          : createSession(tenantId, run.ownerId);
+          ? normalizeSession((await sessionStore.get(sessionId, { tenantId: run.tenantId, workspaceId: run.workspaceId, ownerId: run.ownerId })) ?? { ...createSession(run.tenantId, run.ownerId, run.workspaceId), id: sessionId })
+          : createSession(run.tenantId, run.ownerId, run.workspaceId);
         const result = await executeAgent(agent.name, agentInput, session, {
           signal: controller.signal,
           sessionId: session.id,
           parentRunId: run.id,
           tenantId: run.tenantId,
+          workspaceId: run.workspaceId,
           ownerId: run.ownerId,
+          principal,
         });
         run.childRunIds = [...new Set([...run.childRunIds, result.run.id])];
         await saveWorkflow(run);
@@ -369,11 +445,14 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
 
   return {
     async run(agentName, input, options) {
-      const sessionId = options?.sessionId ?? createSession(options?.tenantId, options?.ownerId).id;
+      const sessionId = options?.sessionId ?? createSession(options?.tenantId, options?.ownerId, options?.workspaceId).id;
       return withSessionLock(sessionId, async () => {
+        const scope = { tenantId: options?.tenantId, workspaceId: options?.workspaceId, ownerId: options?.ownerId };
+        const stored = options?.sessionId ? await sessionStore.get(sessionId, scope) : undefined;
+        if (stored && !matchesScope(stored, scope)) throw new Error("Session not found");
         const session = options?.sessionId
-          ? normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(options?.tenantId, options?.ownerId), id: sessionId })
-          : { ...createSession(options?.tenantId, options?.ownerId), id: sessionId };
+          ? normalizeSession(stored ?? { ...createSession(options?.tenantId, options?.ownerId, options?.workspaceId), id: sessionId })
+          : { ...createSession(options?.tenantId, options?.ownerId, options?.workspaceId), id: sessionId };
         return executeAgent(agentName, input, session, options);
       });
     },
@@ -389,13 +468,16 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
         throw new Error(`Model for agent "${agentName}" does not support streaming`);
       }
 
-      const sessionId = options?.sessionId ?? createSession(options?.tenantId, options?.ownerId).id;
+      const sessionId = options?.sessionId ?? createSession(options?.tenantId, options?.ownerId, options?.workspaceId).id;
       const queue = new AsyncQueue<RuntimeStreamEvent>();
       let steeringNotified = false;
       const operation = withSessionLock(sessionId, async () => {
+        const scope = { tenantId: options?.tenantId, workspaceId: options?.workspaceId, ownerId: options?.ownerId };
+        const stored = options?.sessionId ? await sessionStore.get(sessionId, scope) : undefined;
+        if (stored && !matchesScope(stored, scope)) throw new Error("Session not found");
         const session = options?.sessionId
-          ? (await sessionStore.get(sessionId)) ?? { ...createSession(options?.tenantId, options?.ownerId), id: sessionId }
-          : { ...createSession(options?.tenantId, options?.ownerId), id: sessionId };
+          ? stored ?? { ...createSession(options?.tenantId, options?.ownerId, options?.workspaceId), id: sessionId }
+          : { ...createSession(options?.tenantId, options?.ownerId, options?.workspaceId), id: sessionId };
         return executeAgent(agentName, input, session, {
           ...options,
           streaming: true,
@@ -431,13 +513,14 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       for await (const event of queue) yield event;
     },
 
-    async steer(sessionId, instruction): Promise<Session | SteeringResult> {
+    async steer(sessionId, instruction, scope): Promise<Session | SteeringResult> {
       const content = instruction.trim();
       if (!content) throw new Error("Steering instruction must not be empty");
 
       const activeEntry = [...activeRuns.entries()].find(([, active]) => active.sessionId === sessionId);
       if (activeEntry) {
         const [interruptedRunId, active] = activeEntry;
+        if (!matchesScope(active.run, scope)) throw new Error("Session not found");
         const activeAgent = agents.get(active.agentName);
         if (!activeAgent) throw new Error(`Unknown agent: ${active.agentName}`);
         const continuationSeed = createRun<string>({
@@ -446,6 +529,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           sessionId,
           parentRunId: interruptedRunId,
           tenantId: active.tenantId,
+          workspaceId: active.workspaceId,
           ownerId: active.ownerId,
         });
         const continuationRunId = continuationSeed.id;
@@ -454,8 +538,9 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           active.controller.abort("steered");
           await active.settled;
           await withSessionLock(sessionId, async () => {
-            let session = normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(active.tenantId, active.ownerId), id: sessionId });
-            const interrupted = await runStore.get(interruptedRunId);
+            const activeScope = { tenantId: active.tenantId, workspaceId: active.workspaceId, ownerId: active.ownerId };
+            let session = normalizeSession((await sessionStore.get(sessionId, activeScope)) ?? { ...createSession(active.tenantId, active.ownerId, active.workspaceId), id: sessionId });
+            const interrupted = await runStore.get(interruptedRunId, activeScope);
             let steered: Session | undefined;
             for (let attempt = 0; attempt < 3; attempt++) {
               steered = session.history.at(-1)?.role === "system" && session.history.at(-1)?.content === content
@@ -467,7 +552,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
                 break;
               } catch (error) {
                 if (!(error instanceof StorageConflictError) || attempt === 2) throw error;
-                session = normalizeSession((await sessionStore.get(sessionId)) ?? session);
+                session = normalizeSession((await sessionStore.get(sessionId, activeScope)) ?? session);
               }
             }
             if (!steered) throw new Error("Failed to save the steering instruction");
@@ -486,7 +571,9 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
             await executeAgent(active.agentName, active.input, steered, {
               sessionId,
               tenantId: active.tenantId,
+              workspaceId: active.workspaceId,
               ownerId: active.ownerId,
+              principal: active.principal,
               continuation,
               initialRun: continuationSeed,
               parentRunId: interrupted?.id ?? interruptedRunId,
@@ -497,16 +584,19 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       }
 
       return withSessionLock(sessionId, async () => {
-        const session = normalizeSession((await sessionStore.get(sessionId)) ?? { ...createSession(), id: sessionId });
+        const stored = await sessionStore.get(sessionId, scope);
+        if (stored && !matchesScope(stored, scope)) throw new Error("Session not found");
+        const session = normalizeSession(stored ?? { ...createSession(scope?.tenantId, scope?.ownerId, scope?.workspaceId), id: sessionId });
         const steered = appendMessage(session, { role: "system", content });
         await sessionStore.save(steered, { expectedRevision: session.revision });
         return steered;
       });
     },
 
-    async approve(runId, approvalId) {
-      const storedRun = await runStore.get(runId);
+    async approve(runId, approvalId, scope, principal) {
+      const storedRun = await runStore.get(runId, scope);
       if (!storedRun) throw new Error("Run not found");
+      if (!matchesScope(storedRun, scope)) throw new Error("Run not found");
       if (storedRun.status !== "waiting_approval" || storedRun.pendingApproval?.id !== approvalId) {
         throw new Error("Approval is no longer pending");
       }
@@ -514,7 +604,7 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
         throw new Error("Run cannot be resumed");
       }
       return withSessionLock(storedRun.sessionId, async () => {
-        const session = await sessionStore.get(storedRun.sessionId!);
+        const session = await sessionStore.get(storedRun.sessionId!, scope);
         if (!session) throw new Error("Session not found");
         return executeAgent(
           storedRun.agent!,
@@ -523,21 +613,23 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
           {
             continuation: storedRun.continuation,
             approvedToolCallId: storedRun.pendingApproval!.toolCallId,
+            principal,
           },
           storedRun as Run<string>,
         );
       });
     },
 
-    async reject(runId, approvalId) {
-      const storedRun = await runStore.get(runId);
+    async reject(runId, approvalId, scope) {
+      const storedRun = await runStore.get(runId, scope);
       if (!storedRun) throw new Error("Run not found");
+      if (!matchesScope(storedRun, scope)) throw new Error("Run not found");
       if (storedRun.status !== "waiting_approval" || storedRun.pendingApproval?.id !== approvalId) {
         throw new Error("Approval is no longer pending");
       }
       if (!storedRun.sessionId) throw new Error("Run has no session");
       return withSessionLock(storedRun.sessionId, async () => {
-        const session = await sessionStore.get(storedRun.sessionId!);
+        const session = await sessionStore.get(storedRun.sessionId!, scope);
         if (!session) throw new Error("Session not found");
         const run = controlEvent(
           failRun(storedRun, "Tool approval was rejected", "APPROVAL_REJECTED"),
@@ -548,21 +640,24 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       });
     },
 
-    async cancel(runId) {
+    async cancel(runId, scope) {
       const active = activeRuns.get(runId);
       if (active) {
+        if (!matchesScope(active.run, scope)) return undefined;
         active.controller.abort();
         await active.settled;
-        return (await runStore.get(runId)) ?? runs.get(runId);
+        const activeRun = activeRuns.get(runId)?.run ?? runs.get(runId);
+        return activeRun && matchesScope(activeRun, scope) ? activeRun : await runStore.get(runId, scope);
       }
-      const storedRun = await runStore.get(runId);
+      const storedRun = await runStore.get(runId, scope);
       if (!storedRun) return undefined;
+      if (!matchesScope(storedRun, scope)) return undefined;
       if (storedRun.status === "completed" || storedRun.status === "failed" || storedRun.status === "cancelled") {
         return storedRun;
       }
       if (!storedRun.sessionId) return storedRun;
       return withSessionLock(storedRun.sessionId, async () => {
-        const session = await sessionStore.get(storedRun.sessionId!);
+        const session = await sessionStore.get(storedRun.sessionId!, scope);
         if (!session) return storedRun;
         const run = controlEvent(cancelRun(storedRun), "run.cancelled", { runId });
         return await saveRunForSession(session, run as Run<string>);
@@ -571,11 +666,42 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
 
     getRun: (runId) => activeRuns.get(runId)?.run ?? runs.get(runId),
     getActiveRunForSession: (sessionId) => [...activeRuns.values()].find((active) => active.sessionId === sessionId)?.run,
-    getStoredRun: (runId) => runStore.get(runId),
-    getSession: async (sessionId) => {
-      const session = await sessionStore.get(sessionId);
-      return session ? normalizeSession(session) : undefined;
+    getStoredRun: async (runId, scope) => {
+      const active = activeRuns.get(runId)?.run ?? runs.get(runId);
+      if (active && matchesScope(active, scope)) return active;
+      const stored = await runStore.get(runId, scope);
+      return stored && matchesScope(stored, scope) ? stored : undefined;
     },
+    getSession: async (sessionId, scope) => {
+      const session = await sessionStore.get(sessionId, scope);
+      return session && matchesScope(session, scope) ? normalizeSession(session) : undefined;
+    },
+    renameSession: async (sessionId, title, scope) => {
+      const normalizedTitle = title.trim();
+      if (!normalizedTitle || normalizedTitle.length > 120) {
+        throw new Error("Session title must contain 1 to 120 characters");
+      }
+      return withSessionLock(sessionId, async () => {
+        const session = await sessionStore.get(sessionId, scope);
+        if (!session || !matchesScope(session, scope)) return undefined;
+        return sessionStore.save({ ...normalizeSession(session), title: normalizedTitle }, { expectedRevision: session.revision });
+      });
+    },
+    forkSession: async (sessionId, scope, ownerId) => withSessionLock(sessionId, async () => {
+      const session = await sessionStore.get(sessionId, scope);
+      if (!session || !matchesScope(session, scope)) return undefined;
+      const { revision: _revision, ...source } = normalizeSession(session);
+      const fork: Session = {
+        ...source,
+        id: crypto.randomUUID(),
+        ...(ownerId ? { ownerId } : {}),
+        parentSessionId: session.id,
+        history: session.history.map((message) => ({ ...message })),
+        runIds: [],
+        runs: [],
+      };
+      return sessionStore.save(fork);
+    }),
     getMemoryProvider: (id = defaultMemoryProviderId) => memory.get(id),
     listPlugins: () => bootstrapped.plugins.map(({ id, version, description, dependencies }) => ({
       id,
@@ -599,22 +725,22 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
     runWorkflow(name, input, options) {
       const workflow = workflows.get(name);
       if (!workflow) return Promise.reject(new Error(`Unknown workflow: ${name}`));
-      return executeWorkflow(workflow, input, undefined, undefined, options?.tenantId, options?.ownerId);
+      return executeWorkflow(workflow, input, undefined, undefined, options?.tenantId, options?.ownerId, options?.workspaceId, options?.principal);
     },
-    recoverWorkflows() {
+    recoverWorkflows(scope) {
       if (workflowRecovery) return workflowRecovery;
       if (!workflowStore.listRecoverable) {
         return Promise.reject(new Error("Workflow store does not support recovery listing"));
       }
       workflowRecovery = (async () => {
-        const recoverable = await workflowStore.listRecoverable!();
+        const recoverable = (await workflowStore.listRecoverable!(scope)).filter((run) => matchesScope(run, scope));
         const recovered: WorkflowRun[] = [];
         for (const run of recoverable) {
           const workflow = workflows.get(run.workflow);
           if (!workflow) {
             throw new Error(`Cannot recover workflow run ${run.id}: workflow '${run.workflow}' is not registered`);
           }
-          recovered.push(await executeWorkflow(workflow, run.input, run, undefined, run.tenantId, run.ownerId));
+          recovered.push(await executeWorkflow(workflow, run.input, run, undefined, run.tenantId, run.ownerId, run.workspaceId));
         }
         return recovered;
       })().finally(() => {
@@ -622,26 +748,33 @@ export async function createRuntime(config: RuntimeConfig = {}): Promise<Runtime
       });
       return workflowRecovery;
     },
-    getWorkflowRun: (id) => workflowStore.get(id),
-    async resumeWorkflow(id, approvalId) {
-      const stored = await workflowStore.get(id);
+    getWorkflowRun: async (id, scope) => {
+      const run = await workflowStore.get(id, scope);
+      return run && matchesScope(run, scope) ? run : undefined;
+    },
+    async resumeWorkflow(id, approvalId, scope, principal) {
+      const stored = await workflowStore.get(id, scope);
       if (!stored) throw new Error("Workflow run not found");
+      if (!matchesScope(stored, scope)) throw new Error("Workflow run not found");
       if (["completed", "cancelled"].includes(stored.status)) throw new Error("Workflow cannot be resumed");
       if (stored.status === "waiting_approval") {
         if (!stored.pendingApproval || stored.pendingApproval.id !== approvalId) throw new Error("Approval is no longer pending");
       }
       const workflow = workflows.get(stored.workflow);
       if (!workflow) throw new Error(`Unknown workflow: ${stored.workflow}`);
-      return executeWorkflow(workflow, stored.input, stored, stored.status === "waiting_approval" ? approvalId : undefined);
+      return executeWorkflow(workflow, stored.input, stored, stored.status === "waiting_approval" ? approvalId : undefined, stored.tenantId, stored.ownerId, stored.workspaceId, principal);
     },
-    async cancelWorkflow(id) {
+    async cancelWorkflow(id, scope) {
       const active = activeWorkflows.get(id);
       if (active) {
+        const activeRun = await workflowStore.get(id, scope);
+        if (!activeRun || !matchesScope(activeRun, scope)) return undefined;
         active.controller.abort();
         return active.promise;
       }
-      const stored = await workflowStore.get(id);
+      const stored = await workflowStore.get(id, scope);
       if (!stored) return undefined;
+      if (!matchesScope(stored, scope)) return undefined;
       if (["completed", "failed", "cancelled"].includes(stored.status)) return stored;
       const cancelled = { ...stored, status: "cancelled" as const, error: "The operation was aborted", endedAt: Date.now() };
       return saveWorkflow(cancelled);

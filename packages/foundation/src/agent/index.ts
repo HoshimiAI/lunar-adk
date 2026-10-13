@@ -8,16 +8,18 @@ export { defaultRetryPolicy, withRetry } from "./retry";
 export { AgentRunError } from "./errors";
 export { createCancellation, throwIfAborted } from "./cancellation";
 export { canTransition } from "./state";
-export type { Agent, AgentConfig, AgentHooks, AgentMemoryConfig, AgentRunOptions, AgentRunResult, AgentState } from "./types";
+export type { Agent, AgentConfig, AgentContextConfig, AgentHooks, AgentMemoryConfig, AgentRunOptions, AgentRunResult, AgentState } from "./types";
 export type { AgentErrorCode } from "./errors";
 
 export function defineAgent(config: AgentConfig, bus: EventBus = new EventBus()): Agent {
   const memory = config.memory === true ? {} : config.memory || undefined;
+  const context = config.context === true ? {} : config.context || undefined;
   return {
     name: config.name,
     modelId: config.model.id,
     supportsStreaming: config.model.capabilities.streaming === true && typeof config.model.stream === "function",
     memory,
+    context,
     run: (input: string, options?: AgentRunOptions): Promise<AgentRunResult> =>
       runAgentLoop(config, input, bus, options),
   };

@@ -8,8 +8,11 @@ import type { RunStore } from "../run";
 import type { Workflow, WorkflowRun, WorkflowStore, WorkflowRunOptions } from "../workflow";
 import type { ObservabilityConfig } from "../observability";
 import type { EmbeddingProvider, MemoryProvider } from "../memory";
+import type { ContextProvider } from "../context";
 import type { StorageBundle } from "../storage";
+import type { StorageScope } from "../storage";
 import type { PolicyRule } from "../policy";
+import type { ToolCredentialProvider } from "../tool";
 
 export interface SteeringResult {
   status: "accepted";
@@ -23,6 +26,9 @@ export interface RuntimeConfig {
   policyRules?: PolicyRule[];
   plugins?: Plugin[];
   memory?: MemoryProvider | MemoryProvider[];
+  context?: ContextProvider | ContextProvider[];
+  /** Host-owned vault or OAuth adapter used to resolve short-lived tool credentials. */
+  toolCredentials?: ToolCredentialProvider;
   embedding?: EmbeddingProvider;
   ownsMemory?: boolean;
   runStore?: RunStore;
@@ -37,24 +43,26 @@ export interface RuntimeHandle {
   run(agentName: string, input: string, options?: AgentRunOptions): Promise<AgentRunResult>;
   supportsStreaming(agentName: string): boolean;
   stream(agentName: string, input: string, options?: AgentRunOptions): AsyncIterable<RuntimeStreamEvent>;
-  steer(sessionId: string, instruction: string): Promise<Session | SteeringResult>;
-  approve(runId: string, approvalId: string): Promise<AgentRunResult>;
-  reject(runId: string, approvalId: string): Promise<Run>;
-  cancel(runId: string): Promise<Run | undefined>;
+  steer(sessionId: string, instruction: string, scope?: StorageScope): Promise<Session | SteeringResult>;
+  approve(runId: string, approvalId: string, scope?: StorageScope, principal?: import("../auth").AuthPrincipal): Promise<AgentRunResult>;
+  reject(runId: string, approvalId: string, scope?: StorageScope): Promise<Run>;
+  cancel(runId: string, scope?: StorageScope): Promise<Run | undefined>;
   getRun(runId: string): Run | undefined;
   getActiveRunForSession(sessionId: string): Run | undefined;
-  getStoredRun(runId: string): Promise<Run | undefined>;
-  getSession(sessionId: string): Promise<Session | undefined>;
+  getStoredRun(runId: string, scope?: StorageScope): Promise<Run | undefined>;
+  getSession(sessionId: string, scope?: StorageScope): Promise<Session | undefined>;
+  renameSession(sessionId: string, title: string, scope?: StorageScope): Promise<Session | undefined>;
+  forkSession(sessionId: string, scope?: StorageScope, ownerId?: string): Promise<Session | undefined>;
   getMemoryProvider(id?: string): MemoryProvider | undefined;
   listPlugins(): readonly PluginInfo[];
   on(event: EventName, handler: EventHandler): () => void;
   registerAgent(agent: Agent): void;
   registerWorkflow(workflow: Workflow): void;
   runWorkflow(name: string, input?: unknown, options?: WorkflowRunOptions): Promise<WorkflowRun>;
-  recoverWorkflows(): Promise<WorkflowRun[]>;
-  getWorkflowRun(id: string): Promise<WorkflowRun | undefined>;
-  resumeWorkflow(id: string, approvalId?: string): Promise<WorkflowRun>;
-  cancelWorkflow(id: string): Promise<WorkflowRun | undefined>;
+  recoverWorkflows(scope?: StorageScope): Promise<WorkflowRun[]>;
+  getWorkflowRun(id: string, scope?: StorageScope): Promise<WorkflowRun | undefined>;
+  resumeWorkflow(id: string, approvalId?: string, scope?: StorageScope, principal?: import("../auth").AuthPrincipal): Promise<WorkflowRun>;
+  cancelWorkflow(id: string, scope?: StorageScope): Promise<WorkflowRun | undefined>;
   shutdown?(): Promise<void>;
 }
 
